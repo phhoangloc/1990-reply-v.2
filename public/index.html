@@ -5,6 +5,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>1990 - reply</title>
+  <meta name="ws-path" content="/ws">
+  <meta name="base-route" content="/">
   <style>
     :root {
       --bg: #0e1015;
@@ -113,8 +115,31 @@
       gap: 12px;
       text-align: center;
       padding: 20px;
-      background: radial-gradient(ellipse at center, #1a1e2a 0%, #0a0c11 100%);
-      cursor: pointer
+      background: radial-gradient(ellipse at center, #1a1e2a 0%, #0a0c11 100%)
+    }
+
+    .overlay>div {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px
+    }
+
+    .overlay .joinrow {
+      flex-direction: row;
+      gap: 8px;
+      width: min(420px, 100%)
+    }
+
+    .overlay .joinrow input {
+      flex: 1;
+      min-width: 0;
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font: 14px ui-monospace, Consolas, monospace
     }
 
     .overlay.hidden {
@@ -363,15 +388,30 @@
     <div class="stage" id="stage">
       <canvas id="screen" width="256" height="224"></canvas>
       <div class="overlay" id="overlay">
-        <div class="big">Nạp ROM để bắt đầu chơi</div>
-        <div class="sub">Bấm vào đây, hoặc kéo-thả file <b>.nes</b> (hoặc <b>.zip</b> có chứa ROM) vào khung này.</div>
-        <button class="primary" type="button">Chọn file ROM…</button>
+        <div id="lobby">
+          <div class="big">Chơi NES cùng bạn bè</div>
+          <div class="sub">Tạo phòng rồi gửi liên kết cho bạn bè, hoặc nhập mã phòng để vào phòng có sẵn.</div>
+          <button class="primary" type="button" id="lobbyCreate">Tạo phòng</button>
+          <div class="joinrow">
+            <input id="lobbyCode" type="text" placeholder="Mã phòng hoặc liên kết" maxlength="200" autocomplete="off" spellcheck="false">
+            <button type="button" id="lobbyJoin">Vào phòng</button>
+          </div>
+        </div>
+        <div id="lobbyHost" style="display:none">
+          <div class="big">Phòng đã sẵn sàng</div>
+          <div class="sub">Chọn ROM để bắt đầu chơi, hoặc kéo-thả file <b>.nes</b> (hoặc <b>.zip</b> có chứa ROM) vào khung này. Bạn bè vào phòng sẽ nhận game tự động.</div>
+          <button class="primary" type="button" id="lobbyRom">Chọn file ROM…</button>
+        </div>
+        <div id="lobbyWait" style="display:none">
+          <div class="big" id="lobbyWaitTitle">Đang chờ vào phòng…</div>
+          <div class="sub" id="lobbyWaitSub">Game sẽ tự chạy khi chủ phòng nạp ROM.</div>
+        </div>
         <div class="err" id="err"></div>
       </div>
     </div>
 
     <div class="toolbar">
-      <button class="primary" id="btnLoad" type="button">Nạp ROM</button>
+      <button class="primary" id="btnLoad" type="button" style="display:none">Nạp ROM</button>
       <button id="btnPause" type="button" disabled>Tạm dừng</button>
       <button id="btnReset" type="button" disabled>Khởi động lại</button>
       <span class="sep"></span>
@@ -382,7 +422,7 @@
       <label class="chk"><input type="checkbox" id="chkCrop" checked> Cắt viền 8px</label>
       <button id="btnFull" type="button">Toàn màn hình</button>
       <button id="btnKeys" type="button">Phím điều khiển</button>
-      <button id="btnRoom" type="button">Phòng 2 người</button>
+      <button id="btnLeave" type="button" style="display:none">Rời phòng</button>
     </div>
 
     <div class="touch" id="touch">
@@ -1367,7 +1407,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         const b = KEYMAP[e.code];
         if (b !== undefined) { keyState |= b; audio.init(); if (nes.loaded) e.preventDefault(); return; }
         switch (e.code) {
-          case 'Space': ff = !(net.synced || net.syncing); if (nes.loaded) e.preventDefault(); break;
+          case 'Space': ff = !(net.synced || net.syncing || net.spec); if (nes.loaded) e.preventDefault(); break;
           case 'KeyP': if (!e.repeat) togglePause(); break;
           case 'KeyR': if (!e.repeat && nes.loaded) doReset(); break;
           case 'KeyM': if (!e.repeat) toggleMute(); break;
@@ -1514,7 +1554,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         return new Uint8Array(await new Response(stream).arrayBuffer());
       }
       async function loadFile(file) {
-        if (!file) return;
+        if (!file || !net.ws || net.spec) return;      // chỉ nạp ROM được khi đang ở trong phòng (khán giả thì không)
         errEl.textContent = '';
         try {
           let d = new Uint8Array(await file.arrayBuffer());
@@ -1542,25 +1582,25 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       function showStatus(fps) {
         if (!nes.loaded) return;
         statusEl.textContent = romName + ' · Mapper ' + nes.cart.mapperId + (nes.cart.battery ? ' · 💾' : '') +
-          (paused ? ' · Tạm dừng' : fps ? ' · ' + fps + ' FPS' : '');
+          (net.spec ? ' · Khán giả' : '') + (paused ? ' · Tạm dừng' : fps ? ' · ' + fps + ' FPS' : '');
       }
       const fileInput = $('file');
       const openPicker = () => { fileInput.value = ''; fileInput.click(); };
       fileInput.addEventListener('change', () => loadFile(fileInput.files[0]));
       $('btnLoad').addEventListener('click', e => { e.currentTarget.blur(); openPicker(); });
-      overlay.addEventListener('click', openPicker);
+      $('lobbyRom').addEventListener('click', openPicker);
       ['dragenter', 'dragover'].forEach(t => addEventListener(t, e => { e.preventDefault(); stage.classList.add('drag'); }));
       ['dragleave', 'drop'].forEach(t => addEventListener(t, e => { e.preventDefault(); if (t === 'drop' || e.target === document.documentElement) stage.classList.remove('drag'); }));
       addEventListener('drop', e => { stage.classList.remove('drag'); const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) loadFile(f); });
 
       // ---- controls ----
       function togglePause() {
-        if (!nes.loaded || net.synced || net.syncing) return;
+        if (!nes.loaded || net.synced || net.syncing || net.spec) return;
         paused = !paused; $('btnPause').textContent = paused ? 'Tiếp tục' : 'Tạm dừng';
         if (!paused) { audio.init(); last = 0; }
         showStatus();
       }
-      function doReset() { if (nes.loaded && !net.synced && !net.syncing) { saveSram(); nes.reset(); if (sramKey) loadSram(); paused = false; $('btnPause').textContent = 'Tạm dừng'; showStatus(); } }
+      function doReset() { if (nes.loaded && !net.synced && !net.syncing && !net.spec) { saveSram(); nes.reset(); if (sramKey) loadSram(); paused = false; $('btnPause').textContent = 'Tạm dừng'; showStatus(); } }
       function toggleFull() {
         if (document.fullscreenElement) document.exitFullscreen();
         else if (stage.requestFullscreen) stage.requestFullscreen().catch(() => { });
@@ -1579,13 +1619,16 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       // Mỗi người tự chạy giả lập. Khi chỉ có một người, giả lập chạy tự do (không phụ thuộc ai).
       // Khi có người thứ hai vào, người đang chơi gửi ROM + ảnh chụp trạng thái; người mới tua nhanh cho
       // kịp rồi hai bên chạy lockstep. Ai rời đi thì người còn lại tiếp tục chơi với trạng thái hiện tại.
+      const BASE = document.querySelector('meta[name=base-route]')?.content || '/';
       const NET_DELAY = 3;                 // số frame đệm để bù độ trễ mạng
       const JOIN_AHEAD = 45;               // số frame chừa lại để người mới bắt kịp
       let lastRom = null;
       const net = {
-        ws: null, slot: 0, f: 0, peer: false, existing: false,
+        ws: null, slot: 0, host: false, f: 0, peer: false, existing: false,
         synced: false, syncing: false, sending: false, catchup: false, joinAt: null,
-        localIn: {}, remoteIn: {}, rx: null
+        localIn: {}, remoteIn: {}, rx: null,
+        // khán giả: chạy theo phím của cả hai người chơi (specIn[slot][frame])
+        spec: false, specReady: false, specIn: [{}, {}], specCnt: 0, specQ: new Set()
       };
       function netSend(o) { if (net.ws && net.ws.readyState === 1) net.ws.send(JSON.stringify(o)); }
       function roomMsg(t) { $('roomMsg').textContent = t; }
@@ -1594,18 +1637,33 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         $('roomBusy').style.display = link ? '' : 'none';
         $('roomLink').value = link || '';
         $('roomLeave').style.display = net.ws ? '' : 'none';
+        refreshUi();
+      }
+      // trang chủ: chưa vào phòng -> tạo/vào phòng; chủ phòng -> chọn ROM; người vào -> chờ nhận game
+      function refreshUi() {
+        const inRoom = !!net.ws;
+        $('lobby').style.display = inRoom ? 'none' : '';
+        $('lobbyHost').style.display = inRoom && net.host ? '' : 'none';
+        $('lobbyWait').style.display = inRoom && !net.host ? '' : 'none';
+        $('btnLoad').style.display = inRoom && !net.synced && !net.syncing && !net.spec ? '' : 'none';
+        $('lobbyWaitTitle').textContent = net.spec ? 'Bạn đang là khán giả' : 'Đang chờ vào phòng…';
+        $('lobbyWaitSub').textContent = net.spec ? 'Game sẽ hiện ra khi nhận xong dữ liệu. Có người chơi thoát thì bạn được vào chơi thay.' : 'Game sẽ tự chạy khi chủ phòng nạp ROM.';
+        $('btnLeave').style.display = inRoom ? '' : 'none';
       }
       function enableButtons() { $('btnPause').disabled = !nes.loaded; $('btnReset').disabled = !nes.loaded; }
       function dropPeer() {                 // đối phương không còn: tiếp tục chạy một mình
         net.peer = false; net.existing = false; net.synced = false; net.syncing = false; net.sending = false;
         net.catchup = false; net.joinAt = null; net.localIn = {}; net.remoteIn = {}; net.rx = null;
+        net.specQ.clear();
+        refreshUi();
       }
       function netTeardown() {
-        const w = net.ws; net.ws = null;
+        const w = net.ws; net.ws = null; net.host = false;
+        net.spec = false; net.specReady = false; net.specIn = [{}, {}]; net.specCnt = 0;
         if (w) { try { w.send(JSON.stringify({ t: 'leave' })); w.close(); } catch (e) { } }
         dropPeer(); net.f = 0; roomUi(); enableButtons();
       }
-      function netClose() { netTeardown(); if (location.pathname !== '/') history.replaceState(null, '', '/'); }
+      function netClose() { netTeardown(); if (location.pathname !== BASE) history.replaceState(null, '', BASE); }
 
       // --- chụp / khôi phục trạng thái giả lập (không gồm ROM, bộ đệm âm thanh và khung hình) ---
       function skipKey(o, k) {
@@ -1675,13 +1733,38 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       function startLock() {                // chuyển sang chạy đồng bộ hai bên từ frame net.f
         const J = net.f;
         net.catchup = false; net.sending = false; net.joinAt = null; net.syncing = false; net.synced = true;
+        refreshUi();
         net.localIn = {}; net.remoteIn = {};
         for (let i = 0; i < NET_DELAY; i++) { net.localIn[J + i] = 0; net.remoteIn[J + i] = 0; }
         roomMsg('Đang chơi — bạn là người chơi ' + (net.slot + 1) + '.');
-        closeRoom(); showStatus();
+        closeRoom(); showStatus(); flushSpecs();
+      }
+      // --- người chơi cũ nhất: gửi ROM + trạng thái cho khán giả (cùng phím chưa dùng của hai bên) ---
+      function feedSpectator(id) {
+        const snap = takeSnapshot();
+        netSend({ t: 'feed', id });
+        netSend({ t: 'rom', name: romName, size: lastRom.length });
+        sendChunks(lastRom);
+        netSend({ t: 'romend' });
+        netSend({ t: 'snap', f: net.f, size: snap.blob.length, tree: snap.tree, ls: net.slot, li: net.localIn, ri: net.remoteIn });
+        sendChunks(snap.blob);
+        netSend({ t: 'snapend' });
+        netSend({ t: 'feedend' });
+      }
+      function flushSpecs() {              // chỉ gửi được khi hai người đang chạy đồng bộ
+        if (!net.ws || !net.synced || !nes.loaded || !lastRom || !net.specQ.size) return;
+        const ids = [...net.specQ]; net.specQ.clear();
+        for (const id of ids) feedSpectator(id);
       }
       // chuẩn bị input cho frame sắp chạy; trả false nếu phải chờ đối phương
       function prepFrame() {
+        if (net.spec) {                       // khán giả: chạy theo phím của hai người chơi, không có phím riêng
+          const f = net.f;
+          if (!net.specReady || net.specIn[0][f] === undefined || net.specIn[1][f] === undefined) return false;
+          nes.pads[0].state = net.specIn[0][f]; nes.pads[1].state = net.specIn[1][f];
+          delete net.specIn[0][f]; delete net.specIn[1][f];
+          return true;
+        }
         if (!net.ws) { pollInput(); return true; }
         if (net.sending && net.joinAt !== null && net.f >= net.joinAt) startLock();
         if (net.synced) {
@@ -1720,14 +1803,17 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       function netConnect(first) {
         netTeardown();
         roomMsg('Đang kết nối…');
-        const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+        const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + (document.querySelector('meta[name=ws-path]')?.content || '/ws'));
         ws.binaryType = 'arraybuffer';
-        net.ws = ws;
+        net.ws = ws; refreshUi();
+        const wantRoom = first.t === 'join' ? String(first.room || '').toUpperCase().trim() : null;
         ws.onopen = () => netSend(first);
         ws.onerror = () => { if (net.ws === ws) roomMsg('Không kết nối được tới server.'); };
         ws.onclose = () => {
           if (net.ws !== ws) return;
-          net.ws = null; dropPeer(); roomUi(); enableButtons();
+          const wasSpec = net.spec;
+          net.ws = null; net.spec = false; net.specReady = false; dropPeer(); roomUi(); enableButtons();
+          if (wasSpec) { location.replace(BASE); return; }   // khán giả mất kết nối: về trang chủ
           roomMsg('Mất kết nối với server. Bạn vẫn có thể chơi một mình.');
         };
         ws.onmessage = ev => {
@@ -1741,12 +1827,15 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             return { d, rx };
           };
           if (m.t === 'created') {
-            net.slot = m.slot;
-            history.replaceState(null, '', '/' + m.room);
-            roomUi(location.origin + '/' + m.room);
-            roomMsg('Gửi liên kết này cho bạn bè. Bạn cứ chơi bình thường, họ vào lúc nào cũng được.');
+            net.slot = m.slot; net.host = true;
+            history.replaceState(null, '', BASE + m.room);
+            roomUi(location.origin + BASE + m.room);
+            roomMsg('Gửi liên kết này cho bạn bè. Hãy chọn ROM để bắt đầu chơi, họ vào lúc nào cũng được.');
+            openRoom();
           } else if (m.t === 'joined') {
-            net.slot = m.slot; roomUi(location.href);
+            net.slot = m.slot; net.host = false;
+            if (wantRoom) history.replaceState(null, '', BASE + wantRoom);
+            roomUi(location.href);
             roomMsg('Đã vào phòng, đang chờ người trong phòng gửi game…');
           } else if (m.t === 'peerjoined') {
             net.peer = true; net.existing = true;
@@ -1758,18 +1847,32 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             roomMsg(wasLock ? 'Đối phương đã rời phòng, bạn tiếp tục chơi một mình.' : 'Người kia đã rời phòng.');
             if (wasLock) { $('btnPause').disabled = !nes.loaded; $('btnReset').disabled = !nes.loaded; }
           } else if (m.t === 'rom') {
-            net.existing = false; net.peer = true; net.synced = false; net.syncing = false; net.sending = false; net.catchup = false;
-            net.joinAt = null; net.localIn = {}; net.remoteIn = {};
+            if (net.spec) net.specReady = false;
+            else {
+              net.existing = false; net.peer = true; net.synced = false; net.syncing = false; net.sending = false; net.catchup = false;
+              net.joinAt = null; net.localIn = {}; net.remoteIn = {};
+            }
             if (m.size > 4 * 1024 * 1024) { roomMsg('ROM quá lớn.'); return; }
             net.rx = { kind: 'rom', name: String(m.name || 'ROM'), size: m.size, chunks: [], got: 0 };
           } else if (m.t === 'romend') {
             const g = gather(); if (!g) { roomMsg('Nhận ROM bị lỗi, hãy tải lại trang.'); return; }
             try { receiveLoad(g.d, g.rx.name); } catch (e) { roomMsg('ROM không hợp lệ: ' + e.message); }
           } else if (m.t === 'snap') {
-            net.rx = { kind: 'snap', f: m.f, tree: m.tree, size: m.size, chunks: [], got: 0 };
+            net.rx = { kind: 'snap', f: m.f, tree: m.tree, size: m.size, chunks: [], got: 0, ls: m.ls, li: m.li || {}, ri: m.ri || {} };
           } else if (m.t === 'snapend') {
             const g = gather(); if (!g || !nes.loaded) { roomMsg('Nhận trạng thái game bị lỗi, hãy tải lại trang.'); return; }
             restoreInto({ nes }, 'nes', g.rx.tree, g.d);
+            if (net.spec) {                 // khán giả: nạp phím người chơi đã biết rồi chạy theo, không cần "ready"
+              net.f = g.rx.f;
+              const ls = g.rx.ls === 1 ? 1 : 0;
+              for (const k in g.rx.li) net.specIn[ls][k] = g.rx.li[k] | 0;
+              for (const k in g.rx.ri) net.specIn[1 - ls][k] = g.rx.ri[k] | 0;
+              for (const s of net.specIn) for (const k in s) if (+k < net.f) delete s[k];
+              net.specReady = true; acc = 0; last = 0;
+              roomMsg('Bạn đang xem với tư cách khán giả. Khi có người chơi thoát, bạn sẽ được vào chơi thay.');
+              closeRoom(); showStatus();
+              return;
+            }
             net.f = g.rx.f; net.remoteIn = {};
             netSend({ t: 'ready' });
             roomMsg('Đã nhận game, đang đồng bộ…');
@@ -1778,9 +1881,31 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
           } else if (m.t === 'go') {
             if (nes.loaded && !net.existing) { net.joinAt = m.J; net.catchup = true; acc = 0; last = 0; }
           } else if (m.t === 'in') {
-            net.remoteIn[m.f] = m.v | 0;
+            if (net.spec) {
+              if (!net.specReady && ++net.specCnt > 20000) { net.specIn = [{}, {}]; net.specCnt = 0; } // chưa được gửi game: tránh phình bộ nhớ
+              net.specIn[m.s === 1 ? 1 : 0][m.f] = m.v | 0;
+            } else net.remoteIn[m.f] = m.v | 0;
+          } else if (m.t === 'specjoined') {          // có khán giả mới: gửi game cho họ (khi đã đồng bộ)
+            net.specQ.add(m.id); flushSpecs();
+          } else if (m.t === 'spectating') {
+            net.spec = true; net.specReady = false; net.host = false; net.slot = 0;
+            net.specIn = [{}, {}]; net.specCnt = 0;
+            if (wantRoom) history.replaceState(null, '', BASE + wantRoom);
+            roomUi(location.href);
+            roomMsg('Phòng đã đủ 2 người. Bạn là khán giả, đang chờ nhận game…');
+          } else if (m.t === 'resync') {              // người chơi đổi: trạng thái cũ không còn khớp, chờ gửi lại
+            net.specReady = false; net.specIn = [{}, {}]; net.specCnt = 0; net.rx = null;
+            roomMsg('Có thay đổi người chơi, đang đồng bộ lại…');
+          } else if (m.t === 'promoted') {            // có người chơi thoát: khán giả này được vào thay
+            const ready = net.specReady && nes.loaded;
+            net.spec = false; net.specReady = false; net.specIn = [{}, {}]; net.rx = null;
+            net.slot = m.slot; net.host = !!m.solo;
+            if (m.solo) { net.synced = false; net.syncing = false; }
+            roomMsg(m.solo ? 'Bạn đã vào chơi thay.' : 'Bạn đã được vào chơi thay, đang nhận game…');
+            if (m.solo && ready) { closeRoom(); showStatus(); }
+            refreshUi();
           } else if (m.t === 'error') {
-            netTeardown(); history.replaceState(null, '', '/');
+            netTeardown(); history.replaceState(null, '', BASE);
             roomMsg((m.msg || 'Lỗi') + ' Bạn có thể tạo phòng mới.'); openRoom();
           }
         };
@@ -1788,10 +1913,21 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       const roomModal = $('roomModal');
       function openRoom() { keyState = 0; roomModal.classList.add('open'); }
       function closeRoom() { roomModal.classList.remove('open'); }
-      $('btnRoom').addEventListener('click', e => { e.currentTarget.blur(); openRoom(); });
       $('roomClose').addEventListener('click', closeRoom);
-      $('roomLeave').addEventListener('click', () => { netClose(); roomMsg('Đã rời phòng.'); });
+      // rời phòng -> quay về trang chủ (tải lại trang để dừng game đang chạy)
+      const leaveRoom = () => { netTeardown(); location.replace(BASE); };
+      $('roomLeave').addEventListener('click', leaveRoom);
+      $('btnLeave').addEventListener('click', e => { e.currentTarget.blur(); leaveRoom(); });
       $('roomCreate').addEventListener('click', () => netConnect({ t: 'create' }));
+      $('lobbyCreate').addEventListener('click', () => netConnect({ t: 'create' }));
+      function lobbyJoin() {
+        const m = $('lobbyCode').value.trim().match(/([A-Za-z0-9]{4,12})\/?$/);
+        if (!m) { errEl.textContent = 'Hãy nhập mã phòng (4–12 ký tự) hoặc dán liên kết phòng.'; return; }
+        errEl.textContent = '';
+        openRoom(); netConnect({ t: 'join', room: m[1] });
+      }
+      $('lobbyJoin').addEventListener('click', lobbyJoin);
+      $('lobbyCode').addEventListener('keydown', e => { if (e.key === 'Enter') lobbyJoin(); });
       $('roomCopy').addEventListener('click', () => {
         const el = $('roomLink'); el.select();
         try { navigator.clipboard.writeText(el.value); } catch (e) { document.execCommand('copy'); }
@@ -1800,21 +1936,29 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       roomModal.addEventListener('mousedown', e => { if (e.target === roomModal) closeRoom(); });
       roomUi();
       // người được mời: mở /:id là tự vào phòng
-      const roomPath = location.pathname.match(/^\/([A-Za-z0-9]{4,12})\/?$/);
+      const roomPath = location.pathname.startsWith(BASE) ? location.pathname.slice(BASE.length).match(/^([A-Za-z0-9]{4,12})\/?$/) : null;
       if (roomPath) { openRoom(); netConnect({ t: 'join', room: roomPath[1] }); }
 
       // ---- main loop ----
       const FRAME_MS = 1000 / 60.0988;
       let last = 0, acc = 0, fpsCount = 0, fpsT = 0;
-      function loop(t) {
-        requestAnimationFrame(loop);
+      let lastRaf = 0;
+      function loop(t) { requestAnimationFrame(loop); lastRaf = t; tick(t); }
+      function tick(t) {
         if (!nes.loaded || paused) { last = 0; return; }
         if (!last) { last = t; fpsT = t; return; }
         acc += Math.min(t - last, 100); last = t;
         if (net.catchup) { catchUp(); acc = 0; present(); return; }
         const maxFrames = ff ? 6 : 3;
         let n = 0;
-        nes.apu.mute = ff;
+        // khán giả: nếu đang chậm hơn người chơi từ 8 frame trở lên thì chạy nhanh để bắt kịp (tạm tắt tiếng)
+        let behind = false;
+        if (net.spec && net.specReady) {
+          let k = 0;
+          while (k < 8 && net.specIn[0][net.f + k] !== undefined && net.specIn[1][net.f + k] !== undefined) k++;
+          if (k >= 8) { behind = true; acc += FRAME_MS * 2; }
+        }
+        nes.apu.mute = ff || behind;
         while (acc >= FRAME_MS - 1.5 && n < maxFrames) {
           if (!prepFrame()) { acc = Math.min(acc, FRAME_MS * 2); break; }
           nes.runFrame(); if (net.ws) net.f++;
@@ -1827,6 +1971,12 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         if (t - fpsT >= 1000) { showStatus(Math.round(fpsCount * 1000 / (t - fpsT))); fpsCount = 0; fpsT = t; }
       }
       requestAnimationFrame(loop);
+      // Khi cửa sổ bị che / ở nền, trình duyệt dừng requestAnimationFrame. Chơi 2 người (lockstep) mà một bên dừng thì
+      // bên kia cũng đứng theo, nên dùng Web Worker (không bị hãm khi ở nền) làm đồng hồ dự phòng.
+      try {
+        const w = new Worker(URL.createObjectURL(new Blob(['setInterval(function(){postMessage(0)},8)'], { type: 'text/javascript' })));
+        w.onmessage = () => { const t = performance.now(); if (t - lastRaf > 100) tick(t); };
+      } catch (e) { }
 
       // depuração / testes
       window.nesApp = { nes, loadFile };
