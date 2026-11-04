@@ -7,7 +7,6 @@
   <title>1990 - reply</title>
   <meta name="ws-path" content="/ws">
   <meta name="base-route" content="/">
-  <meta name="ice-servers" content='[{"urls":"stun:stun.l.google.com:19302"}]'>
   <style>
     :root {
       --bg: #0e1015;
@@ -375,12 +374,6 @@
     .modal td button.bind { min-width: 92px; font: 13px ui-monospace, Consolas, monospace }
     .modal td button.bind.listening { background: var(--accent); border-color: var(--accent); color: #fff }
     .modal .actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 14px }
-    .roster { display: none; margin: 0 0 8px; padding: 8px 12px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; font-size: 13px; color: var(--muted); line-height: 1.7 }
-    .roster b { color: var(--text) }
-    .roster .me { color: var(--text); font-weight: 600 }
-    .roster .tag { display: inline-block; padding: 0 7px; margin-right: 6px; border-radius: 99px; background: var(--line); color: var(--text); font-size: 12px }
-    .toast { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); background: var(--panel2); color: var(--text); border: 1px solid var(--line); padding: 8px 16px; border-radius: 10px; font-size: 14px; z-index: 60; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: 90vw }
-    .toast.on { opacity: 1 }
     #roomLink { flex: 1; min-width: 0; background: var(--panel2); border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 6px 10px; font: 14px ui-monospace, Consolas, monospace }
   </style>
 </head>
@@ -391,9 +384,6 @@
       <h1>1990 - <b>REPLY</b></h1>
       <div id="status">Chưa nạp ROM</div>
     </header>
-
-    <div class="roster" id="roster"></div>
-    <div class="toast" id="toast"></div>
 
     <div class="stage" id="stage">
       <canvas id="screen" width="256" height="224"></canvas>
@@ -1334,160 +1324,6 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         }
       }
     }
-    // --- chụp / khôi phục trạng thái giả lập (không gồm ROM, bộ đệm âm thanh và khung hình) ---
-    function skipKey(o, k) {
-      if (o instanceof APU) return ['ring', 'wr', 'rd', 'primed', 'rate', 'cps', 'mute', 'hp', 'px', 'sum', 'n', 'acc'].includes(k);
-      if (o instanceof Cart) return k === 'prg' || (k === 'chr' && !o.chrRam);
-      if (o instanceof PPU) return k === 'fb' || (k === 'chr' && !o.chrRam);
-      return false;
-    }
-    function snapNode(v, cx) {
-      if (v === null || typeof v === 'boolean' || typeof v === 'string') return v;
-      if (typeof v === 'number') return Number.isFinite(v) ? v : { $n: String(v) };
-      if (typeof v !== 'object') return undefined;
-      if (cx.seen.has(v)) return undefined;
-      cx.seen.add(v);
-      if (ArrayBuffer.isView(v)) {
-        const b = new Uint8Array(v.buffer, v.byteOffset, v.byteLength), o = cx.len;
-        cx.parts.push(b); cx.len += b.length; return { $t: 1, o, l: b.length };
-      }
-      if (Array.isArray(v)) return v.map(x => { const r = snapNode(x, cx); return r === undefined ? null : r; });
-      const out = {};
-      for (const k of Object.keys(v)) {
-        if (skipKey(v, k)) continue;
-        const r = snapNode(v[k], cx); if (r !== undefined) out[k] = r;
-      }
-      return out;
-    }
-    function takeSnapshot(nes) {
-      const cx = { seen: new Set(), parts: [], len: 0 };
-      const tree = snapNode(nes, cx);
-      const blob = new Uint8Array(cx.len); let o = 0;
-      for (const p of cx.parts) { blob.set(p, o); o += p.length; }
-      return { tree, blob };
-    }
-    function restoreInto(parent, key, t, blob) {
-      const cur = parent[key];
-      if (t === null) { if (cur === null || typeof cur !== 'object') parent[key] = null; return; }
-      if (typeof t !== 'object') { parent[key] = t; return; }
-      if (t.$n !== undefined) { parent[key] = Number(t.$n); return; }
-      if (t.$t) {
-        if (!ArrayBuffer.isView(cur)) return;
-        const src = blob.subarray(t.o, t.o + t.l), dst = new Uint8Array(cur.buffer, cur.byteOffset, cur.byteLength);
-        dst.set(src.length > dst.length ? src.subarray(0, dst.length) : src); return;
-      }
-      if (cur === null || typeof cur !== 'object') return;
-      if (Array.isArray(t)) { for (let i = 0; i < t.length; i++) restoreInto(cur, i, t[i], blob); return; }
-      for (const k of Object.keys(t)) restoreInto(cur, k, t[k], blob);
-    }
-
-    function restoreSnapshot(nes, s) { restoreInto({ nes }, 'nes', s.tree, s.blob); }
-
-    // ====================================================================
-    //  ROLLBACK NETCODE — cho 2 người chơi (không phụ thuộc DOM nên test được bằng Node)
-    //  Chạy luôn bằng phím ĐOÁN của đối phương (giữ phím mới nhất đã biết). Khi phím thật đến mà khác
-    //  phím đã đoán thì nạp lại ảnh chụp trước frame sai rồi chạy lại tới frame hiện tại.
-    //  frame < conf : đã có phím thật của đối phương và đã chạy đúng (đã "xác nhận")
-    //  conf..f-1    : đã chạy bằng phím đoán, chờ phím thật
-    // ====================================================================
-    class Rollback {
-      constructor(nes, slot, start, opts = {}) {
-        this.nes = nes; this.slot = slot;
-        this.delay = opts.delay === undefined ? 2 : opts.delay;       // phím của mình áp dụng sau N frame (hai bên phải giống nhau)
-        this.maxPred = opts.maxPred || 12;                             // chạy trước tối đa N frame so với frame đã xác nhận
-        this.f = start; this.conf = start; this.gc = start;
-        this.localIn = {}; this.remoteIn = {}; this.used = {}; this.snaps = {};
-        for (const k in (opts.remote || {})) if (+k >= start) this.remoteIn[k] = opts.remote[k];
-        for (let i = 0; i < this.delay; i++) { this.localIn[start + i] = 0; this.remoteIn[start + i] = 0; }
-        this.last = 0; this.rbFrom = null; this.have = start; this.maxSeen = start - 1;
-        for (const k in this.remoteIn) if (+k > this.maxSeen) { this.maxSeen = +k; this.last = this.remoteIn[k]; }
-        while (this.remoteIn[this.have] !== undefined) this.have++;     // have: frame đầu tiên mình CHƯA có phím thật của đối phương
-        this.rollbacks = 0; this.replayed = 0; this.maxDepth = 0;
-        this.lead = 0;                                                  // ước lượng mình đang chạy trước đối phương bao nhiêu frame
-      }
-      // Đồng bộ nhịp: d = số frame mình đã chạy kể từ frame mới nhất của họ mà mình biết (= độ trước + độ trễ mạng).
-      // Hai bên trao đổi d cho nhau; độ trễ mạng giống nhau ở hai chiều nên (d_mình - d_họ) / 2 chính là độ chạy trước.
-      get d() { return this.f - this.maxSeen + this.delay; }
-      onPeerD(pd) { this.lead += ((this.d - pd) / 2 - this.lead) * 0.05; }
-      speed() {                                                       // bên chạy trước thì chạy chậm lại tối đa 25%, bên chạy sau giữ nguyên
-        return 1 - Math.min(0.25, Math.max(0, (this.lead - 0.5) * 0.04));
-      }
-      run(g) {                                                         // chạy 1 frame với phím thật nếu có, không thì phím đoán
-        const r = this.remoteIn[g] !== undefined ? this.remoteIn[g] : this.last, n = this.nes;
-        this.used[g] = r;
-        n.pads[this.slot].state = this.localIn[g]; n.pads[1 - this.slot].state = r;
-        n.runFrame();
-      }
-      advance() {                                                      // đẩy frame xác nhận lên; phát hiện chỗ đoán sai
-        while (this.conf < this.f && this.remoteIn[this.conf] !== undefined) {
-          const c = this.conf;
-          if (this.used[c] !== this.remoteIn[c] && (this.rbFrom === null || c < this.rbFrom)) this.rbFrom = c;
-          this.conf++;
-        }
-      }
-      onRemote(f, v) {                                                 // nhận phím thật của đối phương cho frame f
-        if (f < this.conf || this.remoteIn[f] !== undefined) return;   // tin cũ hoặc trùng (nhận qua cả P2P lẫn server)
-        this.remoteIn[f] = v;
-        if (f > this.maxSeen) { this.maxSeen = f; this.last = v; }      // phím đoán = phím của frame mới nhất đã biết
-        while (this.remoteIn[this.have] !== undefined) this.have++;
-        this.advance();
-      }
-      resolve() {                                                      // nếu đã đoán sai: quay lại và chạy lại. Trả về số frame chạy lại
-        if (this.rbFrom === null) return 0;
-        const from = this.rbFrom, to = this.f, n = this.nes; this.rbFrom = null;
-        restoreSnapshot(n, this.snaps[from]);
-        const mute = n.apu.mute; n.apu.mute = true;                    // chạy lại thì không phát lại âm thanh
-        for (let g = from; g < to; g++) {
-          if (g > from) this.snaps[g] = takeSnapshot(n);
-          this.run(g);
-        }
-        n.apu.mute = mute;
-        this.rollbacks++; this.replayed += to - from; this.maxDepth = Math.max(this.maxDepth, to - from);
-        this.collect();
-        return to - from;
-      }
-      // chạy 1 frame. Trả về số frame mà phím của mình sẽ áp dụng (cần gửi cho đối phương), hoặc -1 nếu phải chờ
-      step(v) {
-        this.resolve();
-        const f = this.f;
-        if (f - this.conf >= this.maxPred) return -1;
-        const nf = f + this.delay; this.localIn[nf] = v;
-        this.snaps[f] = takeSnapshot(this.nes);
-        this.run(f); this.f++;
-        this.advance(); this.collect();
-        return nf;
-      }
-      collect() {                                                      // bỏ dữ liệu của các frame đã xác nhận xong
-        const lim = this.rbFrom === null ? this.conf : this.rbFrom;
-        for (; this.gc < lim; this.gc++) {
-          delete this.snaps[this.gc]; delete this.used[this.gc]; delete this.localIn[this.gc]; delete this.remoteIn[this.gc];
-        }
-      }
-      // trạng thái tại frame đã xác nhận (chỉ gồm phím thật) + các phím từ đó trở đi: dùng để gửi cho khán giả / người mới
-      confirmed() {
-        this.resolve();
-        const f = this.conf;
-        return { f, snap: f < this.f ? this.snaps[f] : takeSnapshot(this.nes), localIn: this.localIn, remoteIn: this.remoteIn };
-      }
-    }
-
-    // Gói phím gửi qua kênh không tin cậy (WebRTC DataChannel): mỗi gói mang lại TẤT CẢ phím mà đối phương chưa báo đã nhận
-    // ("ack" = frame đầu tiên họ còn thiếu), nên mất gói thì gói sau tự bù, không cần TCP.
-    class InputLink {
-      constructor(first) { this.out = {}; this.ack = first; this.last = first - 1; }   // first: frame đầu tiên phải gửi đi
-      push(f, v) { this.out[f] = v; this.last = f; }
-      ackTo(a) { if (a > this.ack) { for (let g = this.ack; g < a; g++) delete this.out[g]; this.ack = a; } }
-      packet(have, d) {                                               // have: frame đầu tiên MÌNH còn thiếu phím của họ; d: xem Rollback.d
-        const from = Math.max(this.ack, this.last - 63), v = [];
-        for (let g = from; g <= this.last && this.out[g] !== undefined; g++) v.push(this.out[g]);
-        return JSON.stringify({ a: have, s: from, v, d });
-      }
-      static decode(str) {
-        let m; try { m = JSON.parse(str); } catch (e) { return null; }
-        if (!m || !Array.isArray(m.v) || !Number.isInteger(m.s) || m.v.length > 256) return null;
-        return { a: Number.isInteger(m.a) ? m.a : 0, s: m.s, v: m.v.map(x => x | 0), d: Number.isInteger(m.d) ? m.d : null };
-      }
-    }
     // ====================================================================
     //  CORE END
     // ====================================================================
@@ -1536,10 +1372,6 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         },
         setVol() { if (this.gain) this.gain.gain.value = muted ? 0 : $('vol').value / 100; }
       };
-      // Trình duyệt chỉ cho phát tiếng sau một thao tác của người dùng. Người vào phòng bằng link không bấm "nạp ROM" nên
-      // trước đây không bao giờ khởi tạo âm thanh -> không có tiếng. Giờ bất kỳ lần bấm chuột / phím / chạm nào cũng bật tiếng.
-      for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(ev, () => audio.init(), true);
-      const audioOn = () => !!audio.ctx && audio.ctx.state === 'running';
       $('vol').value = lsGet('nes-vol', '70');
       $('vol').addEventListener('input', e => { muted = false; audio.setVol(); lsSet('nes-vol', e.target.value); });
       $('vol').addEventListener('change', e => e.target.blur());
@@ -1750,7 +1582,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       function showStatus(fps) {
         if (!nes.loaded) return;
         statusEl.textContent = romName + ' · Mapper ' + nes.cart.mapperId + (nes.cart.battery ? ' · 💾' : '') +
-          (net.spec ? ' · Khán giả' : '') + (audioOn() || muted ? '' : ' · 🔇 bấm phím hoặc click để bật tiếng') + (net.rb ? (dcOpen() ? ' · P2P' : ' · Qua server') : '') + (paused ? ' · Tạm dừng' : fps ? ' · ' + fps + ' FPS' : '');
+          (net.spec ? ' · Khán giả' : '') + (paused ? ' · Tạm dừng' : fps ? ' · ' + fps + ' FPS' : '');
       }
       const fileInput = $('file');
       const openPicker = () => { fileInput.value = ''; fileInput.click(); };
@@ -1788,115 +1620,16 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       // Khi có người thứ hai vào, người đang chơi gửi ROM + ảnh chụp trạng thái; người mới tua nhanh cho
       // kịp rồi hai bên chạy lockstep. Ai rời đi thì người còn lại tiếp tục chơi với trạng thái hiện tại.
       const BASE = document.querySelector('meta[name=base-route]')?.content || '/';
+      const NET_DELAY = 3;                 // số frame đệm để bù độ trễ mạng
       const JOIN_AHEAD = 45;               // số frame chừa lại để người mới bắt kịp
       let lastRom = null;
       const net = {
         ws: null, slot: 0, host: false, f: 0, peer: false, existing: false,
         synced: false, syncing: false, sending: false, catchup: false, joinAt: null,
-        localIn: {}, remoteIn: {}, rx: null, rb: null, roster: null, link: null, pc: null, dc: null, iceQ: [],
+        localIn: {}, remoteIn: {}, rx: null,
         // khán giả: chạy theo phím của cả hai người chơi (specIn[slot][frame])
         spec: false, specReady: false, specIn: [{}, {}], specCnt: 0, specQ: new Set()
       };
-      // ---- WebRTC: gửi phím trực tiếp giữa hai người chơi (UDP, không chờ gói mất). Server chỉ làm signaling. ----
-      // Nếu P2P không thông được thì phím tự đi qua server (WebSocket) như trước.
-      const ICE = (() => { try { return JSON.parse(document.querySelector('meta[name=ice-servers]')?.content || '[]'); } catch (e) { return []; } })();
-      function dcOpen() { return !!net.dc && net.dc.readyState === 'open'; }
-      function gotRemote(f, v) { if (net.rb) net.rb.onRemote(f, v); else if (net.remoteIn[f] === undefined) net.remoteIn[f] = v; }
-      function sendPacket() {
-        if (!dcOpen() || !net.link || !net.rb) return;
-        try { net.dc.send(net.link.packet(net.rb.have, net.rb.d)); } catch (e) { }
-      }
-      function sendInput(nf, v) {
-        net.link.push(nf, v);
-        if (dcOpen()) { sendPacket(); netSend({ t: 'sin', f: nf, v }); }   // 'sin': server chỉ chuyển cho khán giả
-        else netSend({ t: 'in', f: nf, v });
-      }
-      function onDcMessage(str) {
-        const m = InputLink.decode(str); if (!m) return;
-        if (net.link) net.link.ackTo(m.a);
-        if (net.rb && m.d !== null) net.rb.onPeerD(m.d);
-        for (let i = 0; i < m.v.length; i++) gotRemote(m.s + i, m.v[i]);
-      }
-      function dcLost() {                    // mất kênh P2P: gửi lại qua server những phím đối phương chưa xác nhận
-        net.dc = null; if (net.rb) net.rb.lead = 0;
-        if (net.link) for (let g = net.link.ack; g <= net.link.last; g++) if (net.link.out[g] !== undefined) netSend({ t: 'in', f: g, v: net.link.out[g] });
-        showStatus();
-      }
-      function rtcClose() {
-        const pc = net.pc; net.pc = null; net.dc = null; net.iceQ = [];
-        if (net.rb) net.rb.lead = 0;
-        if (pc) { try { pc.close(); } catch (e) { } }
-      }
-      function rtcStart(offerer) {
-        rtcClose();
-        if (typeof RTCPeerConnection === 'undefined') return;
-        const pc = new RTCPeerConnection({ iceServers: ICE }); net.pc = pc;
-        pc.onicecandidate = e => { if (e.candidate && net.pc === pc) netSend({ t: 'sig', c: e.candidate }); };
-        pc.onconnectionstatechange = () => { if (net.pc === pc && (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') && net.dc) dcLost(); };
-        const setup = dc => {
-          net.dc = dc;
-          dc.onopen = () => { if (net.dc === dc) { sendPacket(); showStatus(); } };
-          dc.onclose = () => { if (net.dc === dc) dcLost(); };
-          dc.onmessage = e => { if (typeof e.data === 'string') onDcMessage(e.data); };
-        };
-        if (offerer) {
-          setup(pc.createDataChannel('in', { ordered: false, maxRetransmits: 0 }));
-          pc.createOffer().then(o => pc.setLocalDescription(o)).then(() => netSend({ t: 'sig', d: pc.localDescription })).catch(() => { });
-        } else pc.ondatachannel = e => setup(e.channel);
-      }
-      function rtcSignal(m) {
-        if (typeof RTCPeerConnection === 'undefined') return;
-        if (!net.pc) rtcStart(false);
-        const pc = net.pc;
-        if (m.d) {
-          pc.setRemoteDescription(m.d).then(() => {
-            const q = net.iceQ; net.iceQ = [];
-            for (const c of q) pc.addIceCandidate(c).catch(() => { });
-            if (m.d.type === 'offer') return pc.createAnswer().then(a => pc.setLocalDescription(a)).then(() => netSend({ t: 'sig', d: pc.localDescription }));
-          }).catch(() => { });
-        } else if (m.c) {
-          if (pc.remoteDescription) pc.addIceCandidate(m.c).catch(() => { }); else net.iceQ.push(m.c);
-        }
-      }
-      setInterval(sendPacket, 50);           // gửi lại đều đặn để mất gói cũng được bù, kể cả khi đang đứng chờ
-      // ---- danh sách người trong phòng (người chơi ở trên, khán giả ở dưới) ----
-      let toastT = 0;
-      function toast(t) {
-        const el = $('toast'); el.textContent = t; el.classList.add('on');
-        clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 4000);
-      }
-      function renderRoster() {
-        const el = $('roster'), r = net.roster;
-        el.textContent = '';
-        if (!net.ws || !r) { el.style.display = 'none'; return; }
-        el.style.display = 'block';
-        const d = document.createElement('div');
-        const b = document.createElement('b'); b.textContent = 'Người chơi:'; d.appendChild(b);
-        r.players.forEach((p, i) => {
-          d.appendChild(document.createTextNode(i ? ' · ' : ' '));
-          const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'P' + (p.slot + 1); d.appendChild(t);
-          const n = document.createElement('span'); n.textContent = 'Player ' + (p.slot + 1) + (p.id === r.me ? ' (bạn)' : '');
-          if (p.id === r.me) n.className = 'me';
-          d.appendChild(n);
-        });
-        el.appendChild(d);
-        if (r.specs > 0) {
-          const v = document.createElement('div');
-          const vb = document.createElement('b'); vb.textContent = 'Khách xem:'; v.appendChild(vb);
-          v.appendChild(document.createTextNode(' ' + r.specs));
-          el.appendChild(v);
-        }
-      }
-      function onRoster(m) {
-        net.roster = { me: m.me, players: Array.isArray(m.players) ? m.players : [], specs: m.specs | 0 };
-        renderRoster();
-        const e = m.ev; if (!e || e.id === m.me) return;
-        const pl = 'Player ' + ((e.slot | 0) + 1);
-        if (e.k === 'player') toast(pl + ' đã vào chơi cùng bạn');
-        else if (e.k === 'spec') toast('Có khách vào xem (' + net.roster.specs + ' khách xem)');
-        else if (e.k === 'promoted') toast('Một khách xem được vào chơi thay (' + pl + ')');
-        else if (e.k === 'left') toast(e.role === 'spec' ? 'Một khách xem đã rời phòng' : pl + ' đã rời phòng');
-      }
       function netSend(o) { if (net.ws && net.ws.readyState === 1) net.ws.send(JSON.stringify(o)); }
       function roomMsg(t) { $('roomMsg').textContent = t; }
       function roomUi(link) {
@@ -1916,24 +1649,68 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         $('lobbyWaitTitle').textContent = net.spec ? 'Bạn đang là khán giả' : 'Đang chờ vào phòng…';
         $('lobbyWaitSub').textContent = net.spec ? 'Game sẽ hiện ra khi nhận xong dữ liệu. Có người chơi thoát thì bạn được vào chơi thay.' : 'Game sẽ tự chạy khi chủ phòng nạp ROM.';
         $('btnLeave').style.display = inRoom ? '' : 'none';
-        renderRoster();
       }
       function enableButtons() { $('btnPause').disabled = !nes.loaded; $('btnReset').disabled = !nes.loaded; }
       function dropPeer() {                 // đối phương không còn: tiếp tục chạy một mình
-        rtcClose(); net.link = null;
-        if (net.rb) { try { net.rb.resolve(); } catch (e) { } net.rb = null; }
         net.peer = false; net.existing = false; net.synced = false; net.syncing = false; net.sending = false;
         net.catchup = false; net.joinAt = null; net.localIn = {}; net.remoteIn = {}; net.rx = null;
         net.specQ.clear();
         refreshUi();
       }
       function netTeardown() {
-        const w = net.ws; net.ws = null; net.host = false; net.roster = null;
+        const w = net.ws; net.ws = null; net.host = false;
         net.spec = false; net.specReady = false; net.specIn = [{}, {}]; net.specCnt = 0;
         if (w) { try { w.send(JSON.stringify({ t: 'leave' })); w.close(); } catch (e) { } }
         dropPeer(); net.f = 0; roomUi(); enableButtons();
       }
       function netClose() { netTeardown(); if (location.pathname !== BASE) history.replaceState(null, '', BASE); }
+
+      // --- chụp / khôi phục trạng thái giả lập (không gồm ROM, bộ đệm âm thanh và khung hình) ---
+      function skipKey(o, k) {
+        if (o instanceof APU) return ['ring', 'wr', 'rd', 'primed', 'rate', 'cps', 'mute', 'hp', 'px', 'sum', 'n', 'acc'].includes(k);
+        if (o instanceof Cart) return k === 'prg' || (k === 'chr' && !o.chrRam);
+        if (o instanceof PPU) return k === 'fb' || (k === 'chr' && !o.chrRam);
+        return false;
+      }
+      function snapNode(v, cx) {
+        if (v === null || typeof v === 'boolean' || typeof v === 'string') return v;
+        if (typeof v === 'number') return Number.isFinite(v) ? v : { $n: String(v) };
+        if (typeof v !== 'object') return undefined;
+        if (cx.seen.has(v)) return undefined;
+        cx.seen.add(v);
+        if (ArrayBuffer.isView(v)) {
+          const b = new Uint8Array(v.buffer, v.byteOffset, v.byteLength), o = cx.len;
+          cx.parts.push(b); cx.len += b.length; return { $t: 1, o, l: b.length };
+        }
+        if (Array.isArray(v)) return v.map(x => { const r = snapNode(x, cx); return r === undefined ? null : r; });
+        const out = {};
+        for (const k of Object.keys(v)) {
+          if (skipKey(v, k)) continue;
+          const r = snapNode(v[k], cx); if (r !== undefined) out[k] = r;
+        }
+        return out;
+      }
+      function takeSnapshot() {
+        const cx = { seen: new Set(), parts: [], len: 0 };
+        const tree = snapNode(nes, cx);
+        const blob = new Uint8Array(cx.len); let o = 0;
+        for (const p of cx.parts) { blob.set(p, o); o += p.length; }
+        return { tree, blob };
+      }
+      function restoreInto(parent, key, t, blob) {
+        const cur = parent[key];
+        if (t === null) { if (cur === null || typeof cur !== 'object') parent[key] = null; return; }
+        if (typeof t !== 'object') { parent[key] = t; return; }
+        if (t.$n !== undefined) { parent[key] = Number(t.$n); return; }
+        if (t.$t) {
+          if (!ArrayBuffer.isView(cur)) return;
+          const src = blob.subarray(t.o, t.o + t.l), dst = new Uint8Array(cur.buffer, cur.byteOffset, cur.byteLength);
+          dst.set(src.length > dst.length ? src.subarray(0, dst.length) : src); return;
+        }
+        if (cur === null || typeof cur !== 'object') return;
+        if (Array.isArray(t)) { for (let i = 0; i < t.length; i++) restoreInto(cur, i, t[i], blob); return; }
+        for (const k of Object.keys(t)) restoreInto(cur, k, t[k], blob);
+      }
 
       // --- phía người đang chơi: gửi ROM + trạng thái cho người mới ---
       function sendChunks(u8) {
@@ -1943,7 +1720,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         if (!net.ws || !net.peer || !nes.loaded || !lastRom || net.synced) return;
         paused = false; $('btnPause').textContent = 'Tạm dừng';
         net.syncing = true; net.sending = false; net.joinAt = null; net.localIn = {}; net.remoteIn = {};
-        const snap = takeSnapshot(nes);
+        const snap = takeSnapshot();
         netSend({ t: 'rom', name: romName, size: lastRom.length });
         sendChunks(lastRom);
         netSend({ t: 'romend' });
@@ -1957,26 +1734,25 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         const J = net.f;
         net.catchup = false; net.sending = false; net.joinAt = null; net.syncing = false; net.synced = true;
         refreshUi();
-        net.rb = new Rollback(nes, net.slot, J, { remote: net.remoteIn }); // giữ lại phím của đối phương đã tới sớm
-        net.link = new InputLink(J + net.rb.delay);
         net.localIn = {}; net.remoteIn = {};
+        for (let i = 0; i < NET_DELAY; i++) { net.localIn[J + i] = 0; net.remoteIn[J + i] = 0; }
         roomMsg('Đang chơi — bạn là người chơi ' + (net.slot + 1) + '.');
         closeRoom(); showStatus(); flushSpecs();
       }
       // --- người chơi cũ nhất: gửi ROM + trạng thái cho khán giả (cùng phím chưa dùng của hai bên) ---
       function feedSpectator(id) {
-        const c = net.rb.confirmed(), snap = c.snap;   // trạng thái ở frame đã xác nhận (chỉ gồm phím thật), không phải trạng thái đang đoán
+        const snap = takeSnapshot();
         netSend({ t: 'feed', id });
         netSend({ t: 'rom', name: romName, size: lastRom.length });
         sendChunks(lastRom);
         netSend({ t: 'romend' });
-        netSend({ t: 'snap', f: c.f, size: snap.blob.length, tree: snap.tree, ls: net.slot, li: c.localIn, ri: c.remoteIn });
+        netSend({ t: 'snap', f: net.f, size: snap.blob.length, tree: snap.tree, ls: net.slot, li: net.localIn, ri: net.remoteIn });
         sendChunks(snap.blob);
         netSend({ t: 'snapend' });
         netSend({ t: 'feedend' });
       }
       function flushSpecs() {              // chỉ gửi được khi hai người đang chạy đồng bộ
-        if (!net.ws || !net.synced || !net.rb || !nes.loaded || !lastRom || !net.specQ.size) return;
+        if (!net.ws || !net.synced || !nes.loaded || !lastRom || !net.specQ.size) return;
         const ids = [...net.specQ]; net.specQ.clear();
         for (const id of ids) feedSpectator(id);
       }
@@ -1991,11 +1767,15 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         }
         if (!net.ws) { pollInput(); return true; }
         if (net.sending && net.joinAt !== null && net.f >= net.joinAt) startLock();
-        if (net.synced && net.rb) {            // rollback: chạy luôn bằng phím đoán của đối phương, không chờ mạng
-          const v = localPoll(), nf = net.rb.step(v);
-          if (nf < 0) return false;            // đã chạy trước quá xa so với phím thật cuối cùng nhận được
-          sendInput(nf, v); net.f = net.rb.f;
-          return 'ran';
+        if (net.synced) {
+          const f = net.f;
+          if (net.remoteIn[f] === undefined) return false;
+          const nf = f + NET_DELAY, v = localPoll();
+          net.localIn[nf] = v; netSend({ t: 'in', f: nf, v });
+          nes.pads[net.slot].state = net.localIn[f];
+          nes.pads[1 - net.slot].state = net.remoteIn[f];
+          delete net.localIn[f]; delete net.remoteIn[f];
+          return true;
         }
         const v = localPoll();
         if (net.sending) netSend({ t: 'in', f: net.f, v });
@@ -2016,7 +1796,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         if (net.catchup && net.f >= net.joinAt) startLock();
       }
       function receiveLoad(d, name) {
-        nes.loadRom(d); lastRom = d; romName = name; sramKey = null; audio.init();   // người vào phòng: tạo sẵn âm thanh, tự chạy khi có thao tác đầu tiên
+        nes.loadRom(d); lastRom = d; romName = name; sramKey = null;
         overlay.classList.add('hidden'); document.title = romName + ' — NES Player';
         paused = false; errEl.textContent = ''; enableButtons();
       }
@@ -2032,7 +1812,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         ws.onclose = () => {
           if (net.ws !== ws) return;
           const wasSpec = net.spec;
-          net.ws = null; net.roster = null; net.spec = false; net.specReady = false; dropPeer(); roomUi(); enableButtons();
+          net.ws = null; net.spec = false; net.specReady = false; dropPeer(); roomUi(); enableButtons();
           if (wasSpec) { location.replace(BASE); return; }   // khán giả mất kết nối: về trang chủ
           roomMsg('Mất kết nối với server. Bạn vẫn có thể chơi một mình.');
         };
@@ -2059,7 +1839,6 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             roomMsg('Đã vào phòng, đang chờ người trong phòng gửi game…');
           } else if (m.t === 'peerjoined') {
             net.peer = true; net.existing = true;
-            rtcStart(true);                          // người ở lại trong phòng là bên gọi (offer) kết nối P2P
             if (nes.loaded && lastRom) { roomMsg('Có người vào phòng, đang gửi game cho họ…'); startSync(); }
             else roomMsg('Có người vào phòng. Hãy nạp ROM để cùng chơi.');
           } else if (m.t === 'peerleft') {
@@ -2071,7 +1850,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             if (net.spec) net.specReady = false;
             else {
               net.existing = false; net.peer = true; net.synced = false; net.syncing = false; net.sending = false; net.catchup = false;
-              net.joinAt = null; net.localIn = {}; net.remoteIn = {}; net.rb = null;
+              net.joinAt = null; net.localIn = {}; net.remoteIn = {};
             }
             if (m.size > 4 * 1024 * 1024) { roomMsg('ROM quá lớn.'); return; }
             net.rx = { kind: 'rom', name: String(m.name || 'ROM'), size: m.size, chunks: [], got: 0 };
@@ -2105,11 +1884,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             if (net.spec) {
               if (!net.specReady && ++net.specCnt > 20000) { net.specIn = [{}, {}]; net.specCnt = 0; } // chưa được gửi game: tránh phình bộ nhớ
               net.specIn[m.s === 1 ? 1 : 0][m.f] = m.v | 0;
-            } else gotRemote(m.f, m.v | 0);
-          } else if (m.t === 'roster') {
-            onRoster(m);
-          } else if (m.t === 'sig') {
-            rtcSignal(m);
+            } else net.remoteIn[m.f] = m.v | 0;
           } else if (m.t === 'specjoined') {          // có khán giả mới: gửi game cho họ (khi đã đồng bộ)
             net.specQ.add(m.id); flushSpecs();
           } else if (m.t === 'spectating') {
@@ -2125,7 +1900,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             const ready = net.specReady && nes.loaded;
             net.spec = false; net.specReady = false; net.specIn = [{}, {}]; net.rx = null;
             net.slot = m.slot; net.host = !!m.solo;
-            if (m.solo) { net.synced = false; net.syncing = false; net.rb = null; }
+            if (m.solo) { net.synced = false; net.syncing = false; }
             roomMsg(m.solo ? 'Bạn đã vào chơi thay.' : 'Bạn đã được vào chơi thay, đang nhận game…');
             if (m.solo && ready) { closeRoom(); showStatus(); }
             refreshUi();
@@ -2172,12 +1947,10 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       function tick(t) {
         if (!nes.loaded || paused) { last = 0; return; }
         if (!last) { last = t; fpsT = t; return; }
-        acc += Math.min(t - last, 100) * (net.rb && dcOpen() ? net.rb.speed() : 1); last = t;   // bên chạy trước tự chạy chậm lại cho khớp nhịp
-
+        acc += Math.min(t - last, 100); last = t;
         if (net.catchup) { catchUp(); acc = 0; present(); return; }
         const maxFrames = ff ? 6 : 3;
-        let n = 0, redraw = false;
-        if (net.synced && net.rb) { if (net.rb.resolve()) redraw = true; flushSpecs(); }  // phím thật khác phím đoán -> chạy lại; có khán giả chờ thì gửi game
+        let n = 0;
         // khán giả: nếu đang chậm hơn người chơi từ 8 frame trở lên thì chạy nhanh để bắt kịp (tạm tắt tiếng)
         let behind = false;
         if (net.spec && net.specReady) {
@@ -2187,15 +1960,14 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         }
         nes.apu.mute = ff || behind;
         while (acc >= FRAME_MS - 1.5 && n < maxFrames) {
-          const r = prepFrame();
-          if (!r) { acc = Math.min(acc, FRAME_MS * 2); break; }
-          if (r !== 'ran') { nes.runFrame(); if (net.ws) net.f++; }
+          if (!prepFrame()) { acc = Math.min(acc, FRAME_MS * 2); break; }
+          nes.runFrame(); if (net.ws) net.f++;
           acc -= FRAME_MS; n++; fpsCount++;
           if (ff && n >= 4) break;
         }
         if (n >= maxFrames) acc = 0;
         if (ff) acc = 0;
-        if (n || redraw) present();
+        if (n) present();
         if (t - fpsT >= 1000) { showStatus(Math.round(fpsCount * 1000 / (t - fpsT))); fpsCount = 0; fpsT = t; }
       }
       requestAnimationFrame(loop);
@@ -2207,7 +1979,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       } catch (e) { }
 
       // depuração / testes
-      window.nesApp = { nes, loadFile, net };
+      window.nesApp = { nes, loadFile };
     })();
   </script>
 </body>
