@@ -14,6 +14,15 @@ if (!BASE.endsWith('/')) BASE += '/';
 // WS_PATH: đường dẫn WebSocket, tính từ BASE_ROUTE (vd. BASE=/nes/ + WS_PATH=/ws -> /nes/ws)
 const WS_PATH = BASE + (process.env.WS_PATH || '/ws').trim().replace(/^\/+/, '');
 const ROOT = path.join(__dirname, 'public');
+// ICE_SERVERS: danh sách STUN/TURN cho WebRTC (JSON), vd. [{"urls":"stun:stun.l.google.com:19302"},{"urls":"turn:turn.example.com:3478","username":"u","credential":"p"}]
+// Không đặt thì dùng STUN công cộng của Google trong index.html. Cần TURN nếu một số mạng không kết nối P2P được (khi đó phím tự đi qua server).
+let ICE_META = null;
+try {
+  if (process.env.ICE_SERVERS) {
+    const list = JSON.parse(process.env.ICE_SERVERS);
+    if (Array.isArray(list)) ICE_META = '<meta name="ice-servers" content=\'' + JSON.stringify(list).replace(/&/g, '&amp;').replace(/'/g, '&#39;') + '\'>';
+  }
+} catch { console.warn('ICE_SERVERS không phải JSON hợp lệ, bỏ qua.'); }
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -43,7 +52,8 @@ const server = http.createServer((req, res) => {
     // báo cho trang biết đường dẫn WebSocket hiện tại
     if (path.extname(file).toLowerCase() === '.html') data = data.toString('utf8')
       .replace('<meta name="ws-path" content="/ws">', '<meta name="ws-path" content="' + WS_PATH.replace(/"/g, '') + '">')
-      .replace('<meta name="base-route" content="/">', '<meta name="base-route" content="' + BASE.replace(/"/g, '') + '">');
+      .replace('<meta name="base-route" content="/">', '<meta name="base-route" content="' + BASE.replace(/"/g, '') + '">')
+      .replace(/<meta name="ice-servers" content='[^']*'>/, m => ICE_META || m);
     res.end(data);
   });
 });
@@ -61,6 +71,11 @@ function newCode() {
   do { c = Array.from({ length: 6 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join(''); }
   while (rooms.has(c));
   return c;
+}
+// Danh sách người trong phòng: người chơi (P1, P2) và số khách xem. Gửi cho tất cả mỗi khi có thay đổi, kèm sự kiện vừa xảy ra (ev).
+function announce(r, ev) {
+  const players = r.players.slice().sort((a, b) => a.slot - b.slot).map(p => ({ id: p.id, slot: p.slot }));
+  for (const c of [...r.players, ...r.specs]) send(c, { t: 'roster', me: c.id, players, specs: r.specs.length, ev });
 }
 function send(ws, obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
 function peerOf(ws) {
@@ -84,6 +99,7 @@ function fillSeats(r) {
     send(sp, { t: 'promoted', slot: sp.slot, solo: !other });
     if (other) send(other, { t: 'peerjoined' });
     promoted = true;
+    announce(r, { k: 'promoted', id: sp.id, slot: sp.slot });
   }
   if (promoted) for (const s of r.specs) { s.fed = false; send(s, { t: 'resync' }); } // trạng thái cũ không còn khớp
   askFeeder(r);
@@ -92,17 +108,32 @@ function leave(ws) {
   const code = ws.room; if (!code) return;
   ws.room = null; ws.feeding = false; ws.feedTo = null;
   const r = rooms.get(code); if (!r) return;
-  if (ws.spec) { ws.spec = false; r.specs = r.specs.filter(m => m !== ws); return; }
+  if (ws.spec) {
+    ws.spec = false; r.specs = r.specs.filter(m => m !== ws);
+    announce(r, { k: 'left', role: 'spec', id: ws.id });
+    return;
+  }
   r.players = r.players.filter(m => m !== ws);
   for (const m of r.players) send(m, { t: 'peerleft' });
-  fillSeats(r);
+  if (r.players.length || r.specs.length) announce(r, { k: 'left', role: 'player', id: ws.id, slot: ws.slot });
+  fillSeats(r);                                           // sau đó mới báo khán giả vào chơi thay, để thông báo cuối cùng là "vào chơi thay"
   if (!r.players.length && !r.specs.length) rooms.delete(code);
 }
-const RELAY = new Set(['rom', 'romend', 'snap', 'snapend', 'ready', 'go', 'in']);
+const RELAY = new Set(['rom', 'romend', 'snap', 'snapend', 'ready', 'go', 'in', 'sig']); // 'sig': signaling WebRTC giữa hai người chơi
 const FEED = new Set(['rom', 'romend', 'snap', 'snapend']); // gửi riêng cho 1 khán giả khi người chơi đang "feed"
 
 const wss = new WebSocketServer({ server, path: WS_PATH, maxPayload: 1 << 20 });
+// Heartbeat: ping mỗi 25 giây để proxy (vd. nginx ngắt sau 60 giây im lặng) không cắt kết nối, và dọn người đã mất mạng đột ngột
+const beat = setInterval(() => {
+  for (const c of wss.clients) {
+    if (c.alive === false) { c.terminate(); continue; }   // kỳ trước không trả lời pong -> coi như đã mất kết nối (kích hoạt 'close' -> leave)
+    c.alive = false;
+    try { c.ping(); } catch { }
+  }
+}, 25000);
+wss.on('close', () => clearInterval(beat));
 wss.on('connection', ws => {
+  ws.alive = true; ws.on('pong', () => { ws.alive = true; });
   ws.room = null; ws.slot = 0; ws.id = nextId++; ws.spec = false; ws.fed = false; ws.feeding = false; ws.feedTo = null;
   ws.on('message', (raw, isBinary) => {
     if (isBinary) {
@@ -118,6 +149,7 @@ wss.on('connection', ws => {
       const code = newCode();
       ws.slot = 0; rooms.set(code, { players: [ws], specs: [] }); ws.room = code;
       send(ws, { t: 'created', room: code, slot: 0 });
+      announce(rooms.get(code), { k: 'created', id: ws.id, slot: 0 });
     } else if (m.t === 'join') {
       leave(ws);
       const code = String(m.room || '').toUpperCase().trim();
@@ -128,6 +160,7 @@ wss.on('connection', ws => {
         ws.room = code; ws.spec = true; ws.fed = false;
         r.specs.push(ws);
         send(ws, { t: 'spectating' });
+        announce(r, { k: 'spec', id: ws.id });
         askFeeder(r);
       } else {
         const other = r.players[0];
@@ -135,6 +168,7 @@ wss.on('connection', ws => {
         r.players.push(ws); ws.room = code;
         send(ws, { t: 'joined', slot: ws.slot });
         send(other, { t: 'peerjoined' });
+        announce(r, { k: 'player', id: ws.id, slot: ws.slot });
       }
     } else if (ws.spec) {
       if (m.t === 'leave') leave(ws);                         // khán giả chỉ được rời phòng
@@ -144,6 +178,9 @@ wss.on('connection', ws => {
     } else if (m.t === 'feedend') {
       if (ws.feedTo) ws.feedTo.fed = true;
       ws.feeding = false; ws.feedTo = null;
+    } else if (m.t === 'sin') {                               // phím đã đi thẳng P2P giữa hai người chơi: chỉ báo cho khán giả
+      const r = ws.room && rooms.get(ws.room);
+      if (r) for (const s of r.specs) send(s, { t: 'in', f: m.f, v: m.v, s: ws.slot });
     } else if (RELAY.has(m.t)) {
       if (ws.feeding && FEED.has(m.t)) return send(ws.feedTo, m);
       if (m.t === 'in') {                                     // khán giả nhận phím của cả hai người chơi
