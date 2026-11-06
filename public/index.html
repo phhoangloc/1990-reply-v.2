@@ -371,6 +371,8 @@
     .modal table { width: 100%; border-collapse: collapse }
     .modal td { padding: 5px 4px; border-bottom: 1px solid var(--line) }
     .modal td:first-child { color: var(--muted) }
+    .modal td:not(:first-child), .modal th:not(:first-child) { text-align: center }
+    .modal th { color: var(--muted); font-weight: 600; font-size: 13px; padding: 5px 4px }
     .modal td button.bind { min-width: 92px; font: 13px ui-monospace, Consolas, monospace }
     .modal td button.bind.listening { background: var(--accent); border-color: var(--accent); color: #fff }
     .modal .actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 14px }
@@ -465,7 +467,7 @@
         </tr>
         <tr>
           <td>Tay cầm</td>
-          <td>Hỗ trợ tay cầm chuẩn (Xbox/PlayStation…) — tay cầm thứ 2 điều khiển người chơi 2</td>
+          <td>Hỗ trợ tay cầm chuẩn (Xbox/PlayStation…), có thể gán nút trong "Phím điều khiển"</td>
         </tr>
         <tr>
           <td>Lưu game</td>
@@ -484,9 +486,8 @@
 
   <div class="modal" id="keyModal" role="dialog" aria-modal="true" aria-labelledby="keyTitle">
     <div class="box">
-      <h2 id="keyTitle">Thay đổi phím điều khiển</h2>
-      <p class="hint">Bấm vào một ô rồi nhấn phím mới. <kbd>Esc</kbd> để hủy, <kbd>Delete</kbd> để xóa phím.</p>
-      <table><tbody id="keyRows"></tbody></table>
+      <h2 id="keyTitle">Phím điều khiển</h2>
+      <table><thead><tr><th>Nút NES</th><th>Bàn phím</th><th>Tay cầm</th></tr></thead><tbody id="keyRows"></tbody></table>
       <div class="actions">
         <button type="button" id="keyDefault">Mặc định</button>
         <button type="button" class="primary" id="keyClose">Xong</button>
@@ -1380,17 +1381,18 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       // ---- input ----
       const ACTIONS = [
         ['Lên', 16], ['Xuống', 32], ['Trái', 64], ['Phải', 128],
-        ['Nút A', 1], ['Nút B', 2], ['Select', 4], ['Start', 8]
+        ['A', 1], ['B', 2], ['Select', 4], ['Start', 8],
+        ['Turbo A', 256], ['Turbo B', 512]
       ];
       const DEFAULT_BINDS = [
-        ['ArrowUp', 'KeyW'], ['ArrowDown', 'KeyS'], ['ArrowLeft', 'KeyA'], ['ArrowRight', 'KeyD'],
-        ['KeyX', 'KeyK'], ['KeyZ', 'KeyJ'], ['ShiftLeft', 'Backspace'], ['Enter', '']
+        ['ArrowUp', ''], ['ArrowDown', ''], ['ArrowLeft', ''], ['ArrowRight', ''],
+        ['KeyX', ''], ['KeyZ', ''], ['ShiftLeft', ''], ['Enter', ''], ['KeyC', ''], ['KeyV', '']
       ];
       const RESERVED = ['Space', 'KeyP', 'KeyR', 'KeyM', 'KeyF', 'Escape'];
       let binds = DEFAULT_BINDS.map(a => a.slice());
       try {
         const sv = JSON.parse(lsGet('nes-keys', 'null'));
-        if (Array.isArray(sv) && sv.length === ACTIONS.length) binds = sv.map(a => [String(a[0] || ''), String(a[1] || '')]);
+        if (Array.isArray(sv)) binds = DEFAULT_BINDS.map((d, i) => sv[i] ? [String(sv[i][0] || ''), ''] : d.slice());
       } catch (e) { }
       let KEYMAP = {};
       function rebuildKeymap() {
@@ -1429,26 +1431,76 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         if (m[c]) return m[c];
         return c.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, 'Num ');
       }
+      // ---- gán nút tay cầm (mỗi hành động 1 nút, cùng hàng với phím) ----
+      const DEFAULT_PAD = [12, 13, 14, 15, 1, 0, 8, 9, 3, 2];
+      let padBinds = DEFAULT_PAD.slice();
+      try {
+        const sp = JSON.parse(lsGet('nes-pad1', 'null'));
+        if (Array.isArray(sp)) padBinds = DEFAULT_PAD.map((d, i) => i >= sp.length ? d : (Number.isInteger(sp[i]) ? sp[i] : -1));
+      } catch (e) { }
+      let padListening = -1, padTimer = null, padPrev = [];
+      function savePad() { lsSet('nes-pad1', JSON.stringify(padBinds)); }
+      const PAD_NAMES = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'Back', 'Start', 'L3', 'R3', '↑', '↓', '←', '→', 'Home'];
+      function padLabel(n) { return n < 0 ? '—' : (PAD_NAMES[n] || 'Nút ' + n); }
       function renderKeys() {
         const tb = $('keyRows'); tb.textContent = '';
-        ACTIONS.forEach((a, i) => {
+        // thứ tự hiển thị: Turbo A ngay trên A, Turbo B ngay trên B (chỉ số lưu trữ giữ nguyên)
+        [0, 1, 2, 3, 8, 4, 9, 5, 6, 7].forEach(i => {
+          const a = ACTIONS[i];
           const tr = document.createElement('tr');
           const td = document.createElement('td'); td.textContent = a[0]; tr.appendChild(td);
-          for (let j = 0; j < 2; j++) {
+          for (let j = 0; j < 1; j++) {
             const t = document.createElement('td'), b = document.createElement('button');
             b.type = 'button'; b.className = 'bind'; b.textContent = keyLabel(binds[i][j]);
-            b.addEventListener('click', () => { listening = [i, j]; renderKeys(); });
+            b.addEventListener('click', () => { stopPadListen(); listening = [i, j]; renderKeys(); });
             if (listening && listening[0] === i && listening[1] === j) { b.classList.add('listening'); b.textContent = 'Nhấn phím…'; }
             t.appendChild(b); tr.appendChild(t);
           }
+          const tp = document.createElement('td'), bp = document.createElement('button');
+          bp.type = 'button'; bp.className = 'bind'; bp.textContent = padLabel(padBinds[i]);
+          bp.addEventListener('click', () => startPadListen(i));
+          if (padListening === i) { bp.classList.add('listening'); bp.textContent = 'Nhấn nút…'; }
+          tp.appendChild(bp); tr.appendChild(tp);
           tb.appendChild(tr);
         });
       }
+      function readPadButtons() {
+        let g = [];
+        try { g = Array.from(navigator.getGamepads ? navigator.getGamepads() : []).filter(Boolean); } catch (e) { }
+        const out = [];
+        g.forEach(p => p.buttons.forEach((b, i) => { if (b.pressed) out[i] = true; }));
+        return out;
+      }
+      function stopPadListen() { padListening = -1; if (padTimer) { clearInterval(padTimer); padTimer = null; } }
+      function startPadListen(i) {
+        stopPadListen(); listening = null;
+        padListening = i; padPrev = readPadButtons();
+        padTimer = setInterval(() => {
+          const cur = readPadButtons();
+          for (let k = 0; k < cur.length; k++) {
+            if (cur[k] && !padPrev[k]) {
+              padBinds = padBinds.map(n => n === k ? -1 : n);
+              padBinds[padListening] = k;
+              stopPadListen(); savePad(); renderKeys(); return;
+            }
+          }
+          padPrev = cur;
+        }, 40);
+        renderKeys();
+      }
       function saveKeys() { rebuildKeymap(); keyState = 0; lsSet('nes-keys', JSON.stringify(binds)); }
-      function openKeys() { keyModalOpen = true; listening = null; keyState = 0; renderKeys(); keyModal.classList.add('open'); }
-      function closeKeys() { keyModalOpen = false; listening = null; keyModal.classList.remove('open'); }
+      function openKeys() { keyModalOpen = true; listening = null; stopPadListen(); keyState = 0; renderKeys(); keyModal.classList.add('open'); }
+      function closeKeys() { keyModalOpen = false; listening = null; stopPadListen(); keyModal.classList.remove('open'); }
+      addEventListener('gamepadconnected', () => { if (keyModalOpen) renderKeys(); });
+      addEventListener('gamepaddisconnected', () => { if (keyModalOpen) renderKeys(); });
       addEventListener('keydown', e => {
         if (!keyModalOpen) return;
+        if (padListening >= 0) {
+          e.preventDefault(); e.stopPropagation();
+          if (e.code === 'Delete') { padBinds[padListening] = -1; savePad(); }
+          if (e.code === 'Escape' || e.code === 'Delete') { stopPadListen(); renderKeys(); }
+          return;
+        }
         if (listening) {
           e.preventDefault(); e.stopPropagation();
           if (e.code === 'Escape') { listening = null; renderKeys(); return; }
@@ -1464,31 +1516,38 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       }, true);
       $('btnKeys').addEventListener('click', e => { e.currentTarget.blur(); openKeys(); });
       $('keyClose').addEventListener('click', closeKeys);
-      $('keyDefault').addEventListener('click', () => { binds = DEFAULT_BINDS.map(a => a.slice()); listening = null; saveKeys(); renderKeys(); });
+      $('keyDefault').addEventListener('click', () => {
+        binds = DEFAULT_BINDS.map(a => a.slice()); listening = null; saveKeys(); renderKeys();
+        padBinds = DEFAULT_PAD.slice(); stopPadListen(); savePad(); renderKeys();
+      });
       keyModal.addEventListener('mousedown', e => { if (e.target === keyModal) closeKeys(); });
 
       function padFromGamepad(g) {
         if (!g) return 0;
         const bt = i => g.buttons[i] && g.buttons[i].pressed;
         let s = 0;
-        if (bt(1) || bt(3)) s |= 1;          // A  (botão leste / norte)
-        if (bt(0) || bt(2)) s |= 2;          // B  (botão sul / oeste)
-        if (bt(8)) s |= 4; if (bt(9)) s |= 8;
-        if (bt(12)) s |= 16; if (bt(13)) s |= 32; if (bt(14)) s |= 64; if (bt(15)) s |= 128;
+        padBinds.forEach((b, i) => { if (b >= 0 && bt(b)) s |= ACTIONS[i][1]; });
         const ax = g.axes[0] || 0, ay = g.axes[1] || 0;
         if (ay < -0.5) s |= 16; if (ay > 0.5) s |= 32; if (ax < -0.5) s |= 64; if (ax > 0.5) s |= 128;
         return s;
       }
+      // turbo: giữ nút turbo thì A/B tự bật tắt ~15 lần/giây
+      function applyTurbo(s) {
+        const on = (Math.floor(performance.now() / 33) & 1) === 0;
+        if (s & 256) { if (on) s |= 1; }
+        if (s & 512) { if (on) s |= 2; }
+        return s & 255;
+      }
       function localPoll() {
         let g = [];
         try { g = Array.from(navigator.getGamepads ? navigator.getGamepads() : []).filter(Boolean); } catch (e) { }
-        return keyState | touchState | padFromGamepad(g[0]);
+        return applyTurbo(keyState | touchState | padFromGamepad(g[0]));
       }
       function pollInput() {
         let g = [];
         try { g = Array.from(navigator.getGamepads ? navigator.getGamepads() : []).filter(Boolean); } catch (e) { }
-        nes.pads[0].state = keyState | touchState | padFromGamepad(g[0]);
-        nes.pads[1].state = padFromGamepad(g[1]);
+        nes.pads[0].state = applyTurbo(keyState | touchState | padFromGamepad(g[0]));
+        nes.pads[1].state = 0;
       }
 
       // touch controls
