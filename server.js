@@ -98,7 +98,7 @@ function leave(ws) {
   fillSeats(r);
   if (!r.players.length && !r.specs.length) rooms.delete(code);
 }
-const RELAY = new Set(['rom', 'romend', 'snap', 'snapend', 'ready', 'go', 'in']);
+const RELAY = new Set(['rom', 'romend', 'snap', 'snapend', 'ready', 'go', 'in', 'rtc']);
 const FEED = new Set(['rom', 'romend', 'snap', 'snapend']); // gửi riêng cho 1 khán giả khi người chơi đang "feed"
 
 const wss = new WebSocketServer({ server, path: WS_PATH, maxPayload: 1 << 20 });
