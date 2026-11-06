@@ -346,8 +346,10 @@
     }
 
     .ab {
-      display: flex;
-      gap: 12px;
+      display: grid;
+      grid-template-columns: 68px 68px;
+      gap: 10px 12px;
+      justify-items: center;
       align-items: center
     }
 
@@ -359,8 +361,11 @@
       font-size: 20px
     }
 
-    .ab button:first-child {
-      margin-top: 34px
+    .ab button.turbo {
+      width: 52px;
+      height: 52px;
+      font-size: 10px;
+      line-height: 1.2
     }
     /* modal điều khiển */
     .modal { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px }
@@ -434,7 +439,7 @@
         <span></span><button data-b="32">▼</button><span></span>
       </div>
       <div class="mid"><button data-b="4">SELECT</button><button data-b="8">START</button></div>
-      <div class="ab"><button data-b="2">B</button><button data-b="1">A</button></div>
+      <div class="ab"><button class="turbo" data-b="512">TURBO<br>B</button><button class="turbo" data-b="256">TURBO<br>A</button><button data-b="2">B</button><button data-b="1">A</button></div>
     </div>
 
     <details class="help">
