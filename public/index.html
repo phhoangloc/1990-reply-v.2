@@ -5,6 +5,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>1990 - reply</title>
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="ws-path" content="/ws">
   <meta name="base-route" content="/">
   <style>
@@ -178,13 +181,13 @@
 
     .toolbar {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      overflow-x: auto;
       gap: 8px;
       align-items: center;
       justify-content: center;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 10px;
+      background: none;
+      border: 0;
       padding: 10px
     }
 
@@ -232,6 +235,12 @@
       cursor: pointer
     }
 
+    button.ic, .ic { min-width: 40px; height: 36px; padding: 0 8px; font-size: 18px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; flex: none }
+    .toolbar label.chk { padding: 0 }
+    .toolbar label.chk input { position: absolute; opacity: 0; pointer-events: none }
+    .toolbar label.chk .ic { border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); opacity: .55; cursor: pointer }
+    .toolbar label.chk input:checked + .ic { opacity: 1; border-color: var(--accent) }
+    .toolbar label.chk input:focus-visible + .ic { outline: 2px solid var(--accent) }
     .vol {
       display: flex;
       align-items: center;
@@ -313,6 +322,38 @@
       display: flex
     }
 
+    /* controller ảo: cố định đáy màn hình, full width */
+    .touch {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      z-index: 20;
+      padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+      pointer-events: none
+    }
+
+    .touch button,
+    .touch .dpad,
+    .touch .mid {
+      pointer-events: auto
+    }
+
+    .touch button {
+      opacity: .6;
+      background: var(--panel2)
+    }
+
+    .touch button.on {
+      opacity: .95;
+      background: var(--accent)
+    }
+
+    body.coarse .app {
+      padding-bottom: 210px
+    }
+
     .dpad {
       display: grid;
       grid-template-columns: repeat(3, 54px);
@@ -367,9 +408,47 @@
       font-size: 10px;
       line-height: 1.2
     }
+    /* game full width + full height */
+    @media (max-width: 767.98px) { .vol input[type=range] { display: none } }
+    @media all {
+      html, body { overflow: hidden; height: 100%; overscroll-behavior: none }
+      .app { padding: 0; gap: 0; max-width: none; min-height: 0 }
+      header, .help, footer { display: none }
+      .stage {
+        position: fixed; inset: 0; z-index: 1;
+        width: 100vw; height: 100vh; height: 100dvh;
+        aspect-ratio: auto; border: 0; border-radius: 0; margin: 0; box-shadow: none;
+        padding: 48px;
+        display: grid; place-items: center
+      }
+      .stage canvas {
+        width: min(calc(100vw - 96px), calc((100dvh - 96px) * 4 / 3));
+        height: min(calc(100dvh - 96px), calc((100vw - 96px) * 3 / 4))
+      }
+      .stage:fullscreen, .stage.pfull { padding: 0 }
+      .stage.pfull canvas {
+        width: min(100vw, calc(100dvh * 4 / 3));
+        height: min(100dvh, calc(100vw * 3 / 4))
+      }
+      .toolbar {
+        position: fixed; top: 0; left: 0; right: 0; z-index: 40;
+        padding: 6px 8px
+      }
+      .touch {
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+        padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); pointer-events: none
+      }
+      .touch button, .touch .dpad, .touch .mid { pointer-events: auto }
+      .touch button { opacity: .55; background: var(--panel2) }
+      .touch button.on { opacity: .9; background: var(--accent) }
+    }
     /* modal điều khiển */
     .modal { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px }
     .modal.open { display: flex }
+    #roomMsg { margin: 12px 0 0; font-size: 12px; text-align: center }
+    #roomMsg:empty { display: none }
+    .modal .box { position: relative }
+    .modal .x { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; padding: 0; border: 0; background: none; font-size: 18px; line-height: 1; border-radius: 50% }
     .modal .box { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; width: 100%; max-width: 460px; max-height: 90vh; overflow: auto; padding: 16px 18px }
     .modal h2 { margin: 0 0 4px; font-size: 18px }
     .modal p.hint { margin: 0 0 10px; color: var(--muted); font-size: 13px }
@@ -391,6 +470,21 @@
       <h1>1990 - <b>REPLY</b></h1>
       <div id="status">Chưa nạp ROM</div>
     </header>
+
+    <div class="toolbar">
+      <button class="ic primary" id="btnLoad" type="button" title="Nạp ROM" aria-label="Nạp ROM" style="display:none">📂</button>
+      <button class="ic" id="btnPause" type="button" title="Tạm dừng (P)" aria-label="Tạm dừng" disabled>⏸</button>
+      <button class="ic" id="btnReset" type="button" title="Khởi động lại (R)" aria-label="Khởi động lại" disabled>↻</button>
+      <span class="sep"></span>
+      <div class="vol"><button class="ic" id="volIcon" type="button" title="Bật/tắt tiếng (M)" aria-label="Bật/tắt tiếng">🔊</button><input id="vol" type="range" min="0" max="100" value="70"
+          aria-label="Âm lượng"></div>
+      <span class="sep"></span>
+      <label class="chk" title="Làm mịn"><input type="checkbox" id="chkSmooth"><span class="ic">✨</span></label>
+      <label class="chk" title="Cắt viền 8px"><input type="checkbox" id="chkCrop" checked><span class="ic">✂</span></label>
+      <button class="ic" id="btnFull" type="button" title="Toàn màn hình (F)" aria-label="Toàn màn hình">⛶</button>
+      <button class="ic" id="btnKeys" type="button" title="Phím điều khiển" aria-label="Phím điều khiển">🎮</button>
+      <button class="ic" id="btnLeave" type="button" title="Rời phòng" aria-label="Rời phòng" style="display:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+    </div>
 
     <div class="stage" id="stage">
       <canvas id="screen" width="256" height="224"></canvas>
@@ -415,21 +509,6 @@
         </div>
         <div class="err" id="err"></div>
       </div>
-    </div>
-
-    <div class="toolbar">
-      <button class="primary" id="btnLoad" type="button" style="display:none">Nạp ROM</button>
-      <button id="btnPause" type="button" disabled>Tạm dừng</button>
-      <button id="btnReset" type="button" disabled>Khởi động lại</button>
-      <span class="sep"></span>
-      <div class="vol"><span id="volIcon">Âm lượng</span><input id="vol" type="range" min="0" max="100" value="70"
-          aria-label="Âm lượng"></div>
-      <span class="sep"></span>
-      <label class="chk"><input type="checkbox" id="chkSmooth"> Làm mịn</label>
-      <label class="chk"><input type="checkbox" id="chkCrop" checked> Cắt viền 8px</label>
-      <button id="btnFull" type="button">Toàn màn hình</button>
-      <button id="btnKeys" type="button">Phím điều khiển</button>
-      <button id="btnLeave" type="button" style="display:none">Rời phòng</button>
     </div>
 
     <div class="touch" id="touch">
@@ -494,6 +573,7 @@
       <h2 id="keyTitle">Phím điều khiển</h2>
       <table><thead><tr><th>Nút NES</th><th>Bàn phím</th><th>Tay cầm</th></tr></thead><tbody id="keyRows"></tbody></table>
       <div class="actions">
+        <button type="button" id="keyVirtual" aria-pressed="false">🕹 Controller ảo</button>
         <button type="button" id="keyDefault">Mặc định</button>
         <button type="button" class="primary" id="keyClose">Xong</button>
       </div>
@@ -502,8 +582,8 @@
 
   <div class="modal" id="roomModal" role="dialog" aria-modal="true" aria-labelledby="roomTitle">
     <div class="box">
-      <h2 id="roomTitle">Phòng chơi 2 người</h2>
-      <p class="hint">Tạo phòng rồi gửi liên kết cho bạn bè, họ chỉ cần mở liên kết là vào chơi (ROM sẽ được gửi tự động). Bạn vẫn chơi bình thường khi chưa có ai vào, và ai vào hoặc ra cũng không làm gián đoạn người còn lại.</p>
+      <button type="button" class="x" id="roomClose" aria-label="Đóng">✕</button>
+      <h2 id="roomTitle">Phòng chơi</h2>
       <div id="roomIdle">
         <div class="actions" style="margin-top:0">
           <button type="button" class="primary" id="roomCreate">Tạo phòng</button>
@@ -515,11 +595,7 @@
           <button type="button" id="roomCopy">Sao chép</button>
         </div>
       </div>
-      <p class="hint" id="roomMsg" style="margin-top:12px"></p>
-      <div class="actions">
-        <button type="button" id="roomLeave">Rời phòng</button>
-        <button type="button" class="primary" id="roomClose">Đóng</button>
-      </div>
+      <p class="hint" id="roomMsg"></p>
     </div>
   </div>
 
@@ -1381,7 +1457,9 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       $('vol').value = lsGet('nes-vol', '70');
       $('vol').addEventListener('input', e => { muted = false; audio.setVol(); lsSet('nes-vol', e.target.value); });
       $('vol').addEventListener('change', e => e.target.blur());
-      function toggleMute() { muted = !muted; audio.setVol(); $('volIcon').textContent = muted ? 'Đã tắt tiếng' : 'Âm lượng'; }
+      function setPauseBtn(p) { const b = $('btnPause'); b.textContent = p ? '▶' : '⏸'; b.title = p ? 'Tiếp tục (P)' : 'Tạm dừng (P)'; b.setAttribute('aria-label', p ? 'Tiếp tục' : 'Tạm dừng'); }
+      function toggleMute() { muted = !muted; audio.setVol(); $('volIcon').textContent = muted ? '🔇' : '🔊'; }
+      $('volIcon').addEventListener('click', e => { e.currentTarget.blur(); toggleMute(); });
 
       // ---- input ----
       const ACTIONS = [
@@ -1521,6 +1599,21 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       }, true);
       $('btnKeys').addEventListener('click', e => { e.currentTarget.blur(); openKeys(); });
       $('keyClose').addEventListener('click', closeKeys);
+      // controller ảo (thay cho bàn phím thật)
+      function setVirtualPad(on, save) {
+        document.body.classList.toggle('coarse', on);
+        $('keyVirtual').classList.toggle('primary', on);
+        $('keyVirtual').setAttribute('aria-pressed', on ? 'true' : 'false');
+        touchState = 0; document.querySelectorAll('#touch button.on').forEach(b => b.classList.remove('on'));
+        if (save) lsSet('nes-vpad', on ? '1' : '0');
+      }
+      setVirtualPad(lsGet('nes-vpad', '0') === '1', false);
+      $('keyVirtual').addEventListener('click', e => {
+        e.currentTarget.blur();
+        const on = !document.body.classList.contains('coarse');
+        setVirtualPad(on, true);
+        if (on) closeKeys();
+      });
       $('keyDefault').addEventListener('click', () => {
         binds = DEFAULT_BINDS.map(a => a.slice()); listening = null; saveKeys(); renderKeys();
         padBinds = DEFAULT_PAD.slice(); stopPadListen(); savePad(); renderKeys();
@@ -1556,7 +1649,6 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       }
 
       // touch controls
-      if (matchMedia('(pointer: coarse)').matches) document.body.classList.add('coarse');
       document.querySelectorAll('#touch button').forEach(btn => {
         const bit = +btn.dataset.b;
         const down = e => { e.preventDefault(); audio.init(); touchState |= bit; btn.classList.add('on'); try { btn.setPointerCapture(e.pointerId); } catch (_) { } };
@@ -1629,7 +1721,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
           audio.init();
           romName = file.name.replace(/\.(nes|zip)$/i, '');
           loadSram();
-          paused = false; $('btnPause').textContent = 'Tạm dừng';
+          paused = false; setPauseBtn(false);
           $('btnPause').disabled = false; $('btnReset').disabled = false;
           overlay.classList.add('hidden');
           acc = 0; last = 0;
@@ -1660,14 +1752,25 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       // ---- controls ----
       function togglePause() {
         if (!nes.loaded || net.synced || net.syncing || net.spec) return;
-        paused = !paused; $('btnPause').textContent = paused ? 'Tiếp tục' : 'Tạm dừng';
+        paused = !paused; setPauseBtn(paused);
         if (!paused) { audio.init(); last = 0; }
         showStatus();
       }
-      function doReset() { if (nes.loaded && !net.synced && !net.syncing && !net.spec) { saveSram(); nes.reset(); if (sramKey) loadSram(); paused = false; $('btnPause').textContent = 'Tạm dừng'; showStatus(); } }
+      function doReset() { if (nes.loaded && !net.synced && !net.syncing && !net.spec) { saveSram(); nes.reset(); if (sramKey) loadSram(); paused = false; setPauseBtn(false); showStatus(); } }
+      // iPhone/Safari không có Fullscreen API cho phần tử thường -> dùng chế độ "toàn khung" (bỏ padding)
       function toggleFull() {
-        if (document.fullscreenElement) document.exitFullscreen();
-        else if (stage.requestFullscreen) stage.requestFullscreen().catch(() => { });
+        const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+        if (fsEl()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+        if (stage.classList.contains('pfull')) { stage.classList.remove('pfull'); return; }
+        const req = stage.requestFullscreen || stage.webkitRequestFullscreen;
+        const fallback = () => { if (!fsEl()) stage.classList.add('pfull'); };
+        if (req) {
+          try {
+            const p = req.call(stage);
+            if (p && p.catch) p.catch(fallback);
+          } catch (e) { fallback(); }
+          setTimeout(fallback, 400); // iOS: API có thể tồn tại nhưng không làm gì
+        } else fallback();
       }
       $('btnPause').addEventListener('click', e => { e.currentTarget.blur(); togglePause(); });
       $('btnReset').addEventListener('click', e => { e.currentTarget.blur(); doReset(); });
@@ -1699,8 +1802,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       function roomUi(link) {
         $('roomIdle').style.display = link ? 'none' : '';
         $('roomBusy').style.display = link ? '' : 'none';
-        $('roomLink').value = link || '';
-        $('roomLeave').style.display = net.ws ? '' : 'none';
+        $('roomLink').dataset.link = link || ''; $('roomLink').value = link ? link.split('/').filter(Boolean).pop() : '';
         refreshUi();
       }
       // trang chủ: chưa vào phòng -> tạo/vào phòng; chủ phòng -> chọn ROM; người vào -> chờ nhận game
@@ -1782,7 +1884,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       }
       function startSync() {
         if (!net.ws || !net.peer || !nes.loaded || !lastRom || net.synced) return;
-        paused = false; $('btnPause').textContent = 'Tạm dừng';
+        paused = false; setPauseBtn(false);
         net.syncing = true; net.sending = false; net.joinAt = null; net.localIn = {}; net.remoteIn = {};
         const snap = takeSnapshot();
         netSend({ t: 'rom', name: romName, size: lastRom.length });
@@ -1866,7 +1968,6 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       }
       function netConnect(first) {
         netTeardown();
-        roomMsg('Đang kết nối…');
         const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + (document.querySelector('meta[name=ws-path]')?.content || '/ws'));
         ws.binaryType = 'arraybuffer';
         net.ws = ws; refreshUi();
@@ -1894,8 +1995,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             net.slot = m.slot; net.host = true;
             history.replaceState(null, '', BASE + m.room);
             roomUi(location.origin + BASE + m.room);
-            roomMsg('Gửi liên kết này cho bạn bè. Hãy chọn ROM để bắt đầu chơi, họ vào lúc nào cũng được.');
-            openRoom();
+                openRoom();
           } else if (m.t === 'joined') {
             net.slot = m.slot; net.host = false;
             if (wantRoom) history.replaceState(null, '', BASE + wantRoom);
@@ -1980,7 +2080,6 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       $('roomClose').addEventListener('click', closeRoom);
       // rời phòng -> quay về trang chủ (tải lại trang để dừng game đang chạy)
       const leaveRoom = () => { netTeardown(); location.replace(BASE); };
-      $('roomLeave').addEventListener('click', leaveRoom);
       $('btnLeave').addEventListener('click', e => { e.currentTarget.blur(); leaveRoom(); });
       $('roomCreate').addEventListener('click', () => netConnect({ t: 'create' }));
       $('lobbyCreate').addEventListener('click', () => netConnect({ t: 'create' }));
@@ -1993,9 +2092,9 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       $('lobbyJoin').addEventListener('click', lobbyJoin);
       $('lobbyCode').addEventListener('keydown', e => { if (e.key === 'Enter') lobbyJoin(); });
       $('roomCopy').addEventListener('click', () => {
-        const el = $('roomLink'); el.select();
-        try { navigator.clipboard.writeText(el.value); } catch (e) { document.execCommand('copy'); }
-        roomMsg('Đã sao chép liên kết.');
+        const el = $('roomLink'), btn = $('roomCopy'); el.select();
+        try { navigator.clipboard.writeText(el.dataset.link || el.value); } catch (e) { document.execCommand('copy'); }
+        btn.textContent = 'Đã chép'; setTimeout(() => { btn.textContent = 'Sao chép'; }, 1500);
       });
       roomModal.addEventListener('mousedown', e => { if (e.target === roomModal) closeRoom(); });
       roomUi();
