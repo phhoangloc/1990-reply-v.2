@@ -34,48 +34,43 @@
     }
 
     .app {
-      max-width: 980px;
-      margin: 0 auto;
-      padding: 16px;
+      box-sizing: border-box;
+      padding: 8px 56px 8px 8px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
-      min-height: 100vh
-    }
-
-    header {
-      display: flex;
-      align-items: baseline;
-      gap: 12px;
-      flex-wrap: wrap
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 22px;
-      letter-spacing: .5px
-    }
-
-    h1 b {
-      color: var(--accent)
+      gap: 8px;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden
     }
 
     #status {
+      position: fixed;
+      left: 12px;
+      bottom: 12px;
+      z-index: 40;
+      max-width: calc(100vw - 110px);
+      padding: 2px 10px;
+      background: rgba(0, 0, 0, .55);
+      border-radius: 8px;
       color: var(--muted);
-      font-size: 13px;
-      margin-left: auto;
-      text-align: right
+      font-size: 12px;
+      pointer-events: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis
     }
 
     .stage {
       position: relative;
       margin: 0 auto;
       background: #000;
-      border: 1px solid var(--line);
       border-radius: 10px;
       overflow: hidden;
       aspect-ratio: 4/3;
-      width: min(100%, max(280px, calc((100vh - 250px)*4/3)));
+      width: min(100%, max(160px, calc((100vh - 16px)*4/3)));
+      width: min(100%, max(160px, calc((100dvh - 16px)*4/3)));
+      flex: none;
       box-shadow: 0 10px 40px rgba(0, 0, 0, .5)
     }
 
@@ -178,15 +173,21 @@
     }
 
     .toolbar {
+      position: fixed;
+      top: 8px;
+      right: 8px;
+      z-index: 30;
+      max-height: calc(100vh - 16px);
+      max-height: calc(100dvh - 16px);
+      overflow-y: auto;
+      box-sizing: border-box;
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
+      flex-wrap: nowrap;
       gap: 8px;
       align-items: center;
-      justify-content: center;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 10px
+      justify-content: flex-start;
+      padding: 0
     }
 
     button,
@@ -224,62 +225,22 @@
       border-color: var(--accent2)
     }
 
-    .toolbar label.chk {
-      display: flex;
+    button.ic {
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      font-size: 18px;
+      line-height: 1;
+      display: inline-flex;
       align-items: center;
-      gap: 6px;
-      color: var(--muted);
-      font-size: 14px;
-      cursor: pointer
-    }
-
-    .vol {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--muted);
-      font-size: 14px
-    }
-
-    input[type=range] {
-      accent-color: var(--accent);
-      width: 100px
+      justify-content: center
     }
 
     .sep {
-      width: 1px;
-      height: 24px;
+      width: 24px;
+      height: 1px;
       background: var(--line);
-      margin: 0 4px
-    }
-
-    details.help {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 10px 14px
-    }
-
-    details.help summary {
-      cursor: pointer;
-      color: var(--muted)
-    }
-
-    table.keys {
-      border-collapse: collapse;
-      margin-top: 10px;
-      width: 100%;
-      font-size: 14px
-    }
-
-    table.keys td {
-      padding: 4px 10px;
-      border-bottom: 1px solid var(--line)
-    }
-
-    table.keys td:first-child {
-      color: var(--muted);
-      width: 38%
+      margin: 4px 0
     }
 
     kbd {
@@ -291,78 +252,6 @@
       font: 12px ui-monospace, Consolas, monospace
     }
 
-    footer {
-      color: var(--muted);
-      font-size: 12px;
-      text-align: center;
-      margin-top: auto;
-      padding-bottom: 6px
-    }
-
-    /* touch controls */
-    .touch {
-      display: none;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-      padding: 4px 6px;
-      touch-action: none;
-      user-select: none
-    }
-
-    body.coarse .touch {
-      display: flex
-    }
-
-    .dpad {
-      display: grid;
-      grid-template-columns: repeat(3, 54px);
-      grid-template-rows: repeat(3, 54px);
-      gap: 3px
-    }
-
-    .touch button {
-      touch-action: none;
-      padding: 0;
-      font-size: 18px;
-      border-radius: 12px
-    }
-
-    .touch button.on {
-      background: var(--accent);
-      border-color: var(--accent)
-    }
-
-    .mid {
-      display: flex;
-      gap: 10px;
-      align-self: flex-end
-    }
-
-    .mid button {
-      width: 64px;
-      height: 34px;
-      font-size: 12px;
-      border-radius: 17px
-    }
-
-    .ab {
-      display: flex;
-      gap: 12px;
-      align-items: center
-    }
-
-    .ab button {
-      width: 68px;
-      height: 68px;
-      border-radius: 50%;
-      font-weight: 700;
-      font-size: 20px
-    }
-
-    .ab button:first-child {
-      margin-top: 34px
-    }
     /* modal điều khiển */
     .modal { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px }
     .modal.open { display: flex }
@@ -375,32 +264,28 @@
     .modal td button.bind { min-width: 92px; font: 13px ui-monospace, Consolas, monospace }
     .modal td button.bind.listening { background: var(--accent); border-color: var(--accent); color: #fff }
     .modal .actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 14px }
-    .roster { display: none; margin: 0 0 8px; padding: 8px 12px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; font-size: 13px; color: var(--muted); line-height: 1.7 }
-    .roster b { color: var(--text) }
-    .roster .me { color: var(--text); font-weight: 600 }
-    .roster .tag { display: inline-block; padding: 0 7px; margin-right: 6px; border-radius: 99px; background: var(--line); color: var(--text); font-size: 12px }
-    .toast { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); background: var(--panel2); color: var(--text); border: 1px solid var(--line); padding: 8px 16px; border-radius: 10px; font-size: 14px; z-index: 60; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: 90vw }
-    .toast.on { opacity: 1 }
+    .roster { display: none; position: fixed; top: 12px; left: 12px; z-index: 50; gap: 6px; align-items: center }
+    .roster .badge { box-sizing: border-box; min-width: 30px; height: 28px; padding: 0 7px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: #3a3f4b; color: #8b93a7; font: 700 13px system-ui, sans-serif }
+    .roster .badge.on { background: #22c55e; color: #fff }
+    .roster .badge.me { box-shadow: 0 0 0 2px #fff }
+    .roster .eye { box-sizing: border-box; height: 28px; padding: 0 9px; display: inline-flex; align-items: center; gap: 5px; border-radius: 8px; background: rgba(0, 0, 0, .55); color: #fff; font: 600 13px system-ui, sans-serif }
+    .toasts { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 60; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; max-width: 90vw }
+    .toast { background: var(--panel2); color: var(--text); border: 1px solid var(--line); padding: 8px 16px; border-radius: 10px; font-size: 14px; box-shadow: 0 4px 16px rgba(0,0,0,.4); opacity: 0; transform: translateY(-6px); transition: opacity .2s, transform .2s }
+    .toast.on { opacity: 1; transform: none }
+    .toast.join { border-color: var(--accent); }
     #roomLink { flex: 1; min-width: 0; background: var(--panel2); border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 6px 10px; font: 14px ui-monospace, Consolas, monospace }
   </style>
 </head>
 
 <body>
   <div class="app">
-    <header>
-      <h1>1990 - <b>REPLY</b></h1>
-      <div id="status">Chưa nạp ROM</div>
-    </header>
-
     <div class="roster" id="roster"></div>
-    <div class="toast" id="toast"></div>
+    <div class="toasts" id="toast"></div>
 
     <div class="stage" id="stage">
       <canvas id="screen" width="256" height="224"></canvas>
       <div class="overlay" id="overlay">
         <div id="lobby">
-          <div class="big">Chơi NES cùng bạn bè</div>
-          <div class="sub">Tạo phòng rồi gửi liên kết cho bạn bè, hoặc nhập mã phòng để vào phòng có sẵn.</div>
           <button class="primary" type="button" id="lobbyCreate">Tạo phòng</button>
           <div class="joinrow">
             <input id="lobbyCode" type="text" placeholder="Mã phòng hoặc liên kết" maxlength="200" autocomplete="off" spellcheck="false">
@@ -408,8 +293,10 @@
           </div>
         </div>
         <div id="lobbyHost" style="display:none">
-          <div class="big">Phòng đã sẵn sàng</div>
-          <div class="sub">Chọn ROM để bắt đầu chơi, hoặc kéo-thả file <b>.nes</b> (hoặc <b>.zip</b> có chứa ROM) vào khung này. Bạn bè vào phòng sẽ nhận game tự động.</div>
+          <div style="display:flex;gap:8px;margin:10px 0">
+            <input id="roomLink" type="text" readonly>
+            <button type="button" id="roomCopy">Sao chép</button>
+          </div>
           <button class="primary" type="button" id="lobbyRom">Chọn file ROM…</button>
         </div>
         <div id="lobbyWait" style="display:none">
@@ -421,108 +308,29 @@
     </div>
 
     <div class="toolbar">
-      <button class="primary" id="btnLoad" type="button" style="display:none">Nạp ROM</button>
-      <button id="btnPause" type="button" disabled>Tạm dừng</button>
-      <button id="btnReset" type="button" disabled>Khởi động lại</button>
+      <button class="primary ic" id="btnLoad" type="button" title="Nạp ROM" aria-label="Nạp ROM" style="display:none">📂</button>
+      <button class="ic" id="btnReset" type="button" title="Khởi động lại (R)" aria-label="Khởi động lại" disabled>↻</button>
       <span class="sep"></span>
-      <div class="vol"><span id="volIcon">Âm lượng</span><input id="vol" type="range" min="0" max="100" value="70"
-          aria-label="Âm lượng"></div>
-      <span class="sep"></span>
-      <label class="chk"><input type="checkbox" id="chkSmooth"> Làm mịn</label>
-      <label class="chk"><input type="checkbox" id="chkCrop" checked> Cắt viền 8px</label>
-      <button id="btnFull" type="button">Toàn màn hình</button>
-      <button id="btnKeys" type="button">Phím điều khiển</button>
-      <button id="btnLeave" type="button" style="display:none">Rời phòng</button>
+      <button class="ic" id="btnMute" type="button" title="Tắt tiếng (M)" aria-label="Tắt tiếng">🔊</button>
+      <button class="ic" id="btnFull" type="button" title="Toàn màn hình (F)" aria-label="Toàn màn hình">⛶</button>
+      <button class="ic" id="btnKeys" type="button" title="Phím điều khiển" aria-label="Phím điều khiển">🎮</button>
+      <button class="ic" id="btnLink" type="button" title="Sao chép liên kết phòng" aria-label="Sao chép liên kết phòng" style="display:none">🔗</button>
+      <button class="ic" id="btnVoice" type="button" title="Bật mic" aria-label="Bật mic" style="display:none">🎤</button>
+      <button class="ic" id="btnLeave" type="button" title="Rời phòng" aria-label="Rời phòng" style="display:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+      <div id="status">Chưa nạp ROM</div>
     </div>
 
-    <div class="touch" id="touch">
-      <div class="dpad">
-        <span></span><button data-b="16">▲</button><span></span>
-        <button data-b="64">◀</button><span></span><button data-b="128">▶</button>
-        <span></span><button data-b="32">▼</button><span></span>
-      </div>
-      <div class="mid"><button data-b="4">SELECT</button><button data-b="8">START</button></div>
-      <div class="ab"><button data-b="2">B</button><button data-b="1">A</button></div>
-    </div>
-
-    <details class="help">
-      <summary>Phím điều khiển &amp; mẹo</summary>
-      <table class="keys">
-        <tr>
-          <td>Di chuyển</td>
-          <td><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> hoặc <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>
-          </td>
-        </tr>
-        <tr>
-          <td>Nút A / B</td>
-          <td><kbd>X</kbd> hoặc <kbd>K</kbd> / <kbd>Z</kbd> hoặc <kbd>J</kbd></td>
-        </tr>
-        <tr>
-          <td>Start / Select</td>
-          <td><kbd>Enter</kbd> / <kbd>Shift</kbd> hoặc <kbd>Backspace</kbd></td>
-        </tr>
-        <tr>
-          <td>Tua nhanh (giữ)</td>
-          <td><kbd>Space</kbd></td>
-        </tr>
-        <tr>
-          <td>Tạm dừng / Reset</td>
-          <td><kbd>P</kbd> / <kbd>R</kbd></td>
-        </tr>
-        <tr>
-          <td>Tắt tiếng / Toàn màn hình</td>
-          <td><kbd>M</kbd> / <kbd>F</kbd></td>
-        </tr>
-        <tr>
-          <td>Tay cầm</td>
-          <td>Hỗ trợ tay cầm chuẩn (Xbox/PlayStation…) — tay cầm thứ 2 điều khiển người chơi 2</td>
-        </tr>
-        <tr>
-          <td>Lưu game</td>
-          <td>Game có pin (battery save) được lưu tự động trong trình duyệt</td>
-        </tr>
-      </table>
-      <p style="color:var(--muted);font-size:13px;margin:10px 0 0">
-        Mapper hỗ trợ: 0 (NROM), 1 (MMC1), 2 (UxROM), 3 (CNROM), 4 (MMC3), 7 (AxROM), 11, 66 (GxROM), 71 — đủ chạy phần
-        lớn thư viện game NES.
-      </p>
-    </details>
-
-    <footer>Ứng dụng không kèm ROM. Hãy dùng ROM bạn sở hữu hợp pháp.</footer>
   </div>
   <input type="file" id="file" accept=".nes,.zip,application/zip" hidden>
 
   <div class="modal" id="keyModal" role="dialog" aria-modal="true" aria-labelledby="keyTitle">
     <div class="box">
       <h2 id="keyTitle">Thay đổi phím điều khiển</h2>
-      <p class="hint">Bấm vào một ô rồi nhấn phím mới. <kbd>Esc</kbd> để hủy, <kbd>Delete</kbd> để xóa phím.</p>
+      <p class="hint">Bấm vào một ô rồi nhấn phím mới (cột 🎮: nhấn một nút trên tay cầm). <kbd>Esc</kbd> để hủy, <kbd>Delete</kbd> để xóa phím.</p>
       <table><tbody id="keyRows"></tbody></table>
       <div class="actions">
         <button type="button" id="keyDefault">Mặc định</button>
         <button type="button" class="primary" id="keyClose">Xong</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal" id="roomModal" role="dialog" aria-modal="true" aria-labelledby="roomTitle">
-    <div class="box">
-      <h2 id="roomTitle">Phòng chơi 2 người</h2>
-      <p class="hint">Tạo phòng rồi gửi liên kết cho bạn bè, họ chỉ cần mở liên kết là vào chơi (ROM sẽ được gửi tự động). Bạn vẫn chơi bình thường khi chưa có ai vào, và ai vào hoặc ra cũng không làm gián đoạn người còn lại.</p>
-      <div id="roomIdle">
-        <div class="actions" style="margin-top:0">
-          <button type="button" class="primary" id="roomCreate">Tạo phòng</button>
-        </div>
-      </div>
-      <div id="roomBusy" style="display:none">
-        <div class="actions" style="margin-top:0">
-          <input id="roomLink" type="text" readonly>
-          <button type="button" id="roomCopy">Sao chép</button>
-        </div>
-      </div>
-      <p class="hint" id="roomMsg" style="margin-top:12px"></p>
-      <div class="actions">
-        <button type="button" id="roomLeave">Rời phòng</button>
-        <button type="button" class="primary" id="roomClose">Đóng</button>
       </div>
     </div>
   </div>
@@ -1503,6 +1311,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       const buf = new ArrayBuffer(256 * 240 * 4);
       const fb32 = new Uint32Array(buf);
       const img = new ImageData(new Uint8ClampedArray(buf), 256, 240);
+      const VOLUME = 0.7;                   // âm lượng cố định, chỉ bật/tắt tiếng
       let crop = true, paused = false, romName = '', ff = false, muted = false;
       const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } };
       const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { } };
@@ -1534,31 +1343,37 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             this.setVol();
           } catch (e) { console.warn('Audio không khả dụng:', e); }
         },
-        setVol() { if (this.gain) this.gain.gain.value = muted ? 0 : $('vol').value / 100; }
+        setVol() { if (this.gain) this.gain.gain.value = muted ? 0 : VOLUME; }
       };
       // Trình duyệt chỉ cho phát tiếng sau một thao tác của người dùng. Người vào phòng bằng link không bấm "nạp ROM" nên
       // trước đây không bao giờ khởi tạo âm thanh -> không có tiếng. Giờ bất kỳ lần bấm chuột / phím / chạm nào cũng bật tiếng.
       for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(ev, () => audio.init(), true);
       const audioOn = () => !!audio.ctx && audio.ctx.state === 'running';
-      $('vol').value = lsGet('nes-vol', '70');
-      $('vol').addEventListener('input', e => { muted = false; audio.setVol(); lsSet('nes-vol', e.target.value); });
-      $('vol').addEventListener('change', e => e.target.blur());
-      function toggleMute() { muted = !muted; audio.setVol(); $('volIcon').textContent = muted ? 'Đã tắt tiếng' : 'Âm lượng'; }
+      function muteUi() {
+        const b = $('btnMute'); b.textContent = muted ? '🔇' : '🔊';
+        b.title = muted ? 'Bật tiếng (M)' : 'Tắt tiếng (M)'; b.setAttribute('aria-label', muted ? 'Bật tiếng' : 'Tắt tiếng');
+        b.classList.toggle('primary', muted);
+      }
+      function toggleMute() { muted = !muted; audio.setVol(); muteUi(); lsSet('nes-muted', muted ? '1' : '0'); }
+      muted = lsGet('nes-muted', '0') === '1'; muteUi();
+      $('btnMute').addEventListener('click', e => { e.currentTarget.blur(); toggleMute(); });
 
       // ---- input ----
       const ACTIONS = [
         ['Lên', 16], ['Xuống', 32], ['Trái', 64], ['Phải', 128],
-        ['Nút A', 1], ['Nút B', 2], ['Select', 4], ['Start', 8]
+        ['Nút A', 1], ['Nút B', 2], ['Select', 4], ['Start', 8],
+        ['Turbo A', 256], ['Turbo B', 512]       // bit 256/512 chỉ là cờ nội bộ, được đổi thành A/B bấm liên tục khi gửi vào máy
       ];
       const DEFAULT_BINDS = [
-        ['ArrowUp', 'KeyW'], ['ArrowDown', 'KeyS'], ['ArrowLeft', 'KeyA'], ['ArrowRight', 'KeyD'],
-        ['KeyX', 'KeyK'], ['KeyZ', 'KeyJ'], ['ShiftLeft', 'Backspace'], ['Enter', '']
+        ['ArrowUp', ''], ['ArrowDown', ''], ['ArrowLeft', ''], ['ArrowRight', ''],
+        ['KeyX', ''], ['KeyZ', ''], ['ShiftLeft', ''], ['Enter', ''],
+        ['KeyC', ''], ['KeyV', '']
       ];
       const RESERVED = ['Space', 'KeyP', 'KeyR', 'KeyM', 'KeyF', 'Escape'];
       let binds = DEFAULT_BINDS.map(a => a.slice());
       try {
         const sv = JSON.parse(lsGet('nes-keys', 'null'));
-        if (Array.isArray(sv) && sv.length === ACTIONS.length) binds = sv.map(a => [String(a[0] || ''), String(a[1] || '')]);
+        if (Array.isArray(sv) && sv.length >= 8) binds = ACTIONS.map((_, i) => sv[i] ? [String(sv[i][0] || ''), ''] : DEFAULT_BINDS[i].slice());   // 1 phím bàn phím mỗi hành động; cấu hình cũ thiếu turbo thì lấy mặc định
       } catch (e) { }
       let KEYMAP = {};
       function rebuildKeymap() {
@@ -1567,7 +1382,13 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         if (KEYMAP.ShiftLeft !== undefined && KEYMAP.ShiftRight === undefined) KEYMAP.ShiftRight = KEYMAP.ShiftLeft;
       }
       rebuildKeymap();
-      let keyState = 0, touchState = 0;
+      let keyState = 0;
+      // turbo: giữ nút thì A/B tự bấm-nhả liên tục (~15 lần/giây)
+      // bit 256/512 (phím/tay cầm Turbo A/B) -> A/B nhấp nháy; bỏ các bit nội bộ trước khi đưa vào máy NES
+      const compose = raw => {
+        const t = (raw >> 8) & 3;
+        return (raw & 255) | (t && (Math.floor(performance.now() / 33) & 1) ? t : 0);
+      };
       addEventListener('keydown', e => {
         if (keyModalOpen) return;
         if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -1599,24 +1420,74 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       }
       function renderKeys() {
         const tb = $('keyRows'); tb.textContent = '';
-        ACTIONS.forEach((a, i) => {
+        // thứ tự hiển thị: Turbo xếp ngay trên nút tương ứng (giống controller cảm ứng); chỉ đổi cách hiển thị, không đổi chỉ số lưu
+        [0, 1, 2, 3, 8, 4, 9, 5, 6, 7].forEach(i => {
+          const a = ACTIONS[i];
           const tr = document.createElement('tr');
           const td = document.createElement('td'); td.textContent = a[0]; tr.appendChild(td);
-          for (let j = 0; j < 2; j++) {
+          for (let j = 0; j < 1; j++) {
             const t = document.createElement('td'), b = document.createElement('button');
             b.type = 'button'; b.className = 'bind'; b.textContent = keyLabel(binds[i][j]);
-            b.addEventListener('click', () => { listening = [i, j]; renderKeys(); });
+            b.addEventListener('click', () => { stopPadListen(); listening = [i, j]; renderKeys(); });
             if (listening && listening[0] === i && listening[1] === j) { b.classList.add('listening'); b.textContent = 'Nhấn phím…'; }
             t.appendChild(b); tr.appendChild(t);
           }
+          // cột tay cầm
+          const tp = document.createElement('td'), bp = document.createElement('button');
+          bp.type = 'button'; bp.className = 'bind'; bp.textContent = '🎮 ' + padLabel(padBinds[i]);
+          bp.addEventListener('click', () => startPadListen(i));
+          if (padListening === i) { bp.classList.add('listening'); bp.textContent = '🎮 Nhấn nút…'; }
+          tp.appendChild(bp); tr.appendChild(tp);
           tb.appendChild(tr);
         });
       }
+      // ---- gán nút tay cầm ----
+      const DEFAULT_PAD = [12, 13, 14, 15, 1, 0, 8, 9, 3, 2];   // lên, xuống, trái, phải, A, B, Select, Start, Turbo A, Turbo B (-1 = chưa gán)
+      let padBinds = DEFAULT_PAD.slice(), padListening = null, padTimer = null, padBase = new Set();
+      try {
+        const sp = JSON.parse(lsGet('nes-pad', 'null'));
+        if (Array.isArray(sp) && sp.length >= 8) padBinds = ACTIONS.map((_, i) => i < sp.length ? (Number.isInteger(sp[i]) ? sp[i] : -1) : DEFAULT_PAD[i]);
+      } catch (e) { }
+      function savePad() { lsSet('nes-pad', JSON.stringify(padBinds)); }
+      function padLabel(b) {
+        if (b < 0) return '—';
+        const m = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'Back', 'Start', 'L3', 'R3', '↑', '↓', '←', '→', 'Home'];
+        return m[b] ? m[b] + ' (' + b + ')' : 'Nút ' + b;
+      }
+      function pressedPadButtons() {
+        let g = [];
+        try { g = Array.from(navigator.getGamepads ? navigator.getGamepads() : []).filter(Boolean); } catch (e) { }
+        const out = [];
+        if (g[0]) g[0].buttons.forEach((b, i) => { if (b && b.pressed) out.push(i); });
+        return out;
+      }
+      function stopPadListen() { clearInterval(padTimer); padTimer = null; padListening = null; }
+      function startPadListen(i) {
+        listening = null; stopPadListen(); padListening = i;
+        padBase = new Set(pressedPadButtons());           // bỏ qua nút đang giữ sẵn
+        renderKeys();
+        padTimer = setInterval(() => {
+          const p = pressedPadButtons();
+          for (const b of p) {
+            if (padBase.has(b)) continue;
+            padBinds.forEach((v, k) => { if (v === b) padBinds[k] = -1; });
+            padBinds[padListening] = b;
+            stopPadListen(); savePad(); renderKeys(); return;
+          }
+          padBase = new Set(p.filter(b => padBase.has(b)));
+        }, 50);
+      }
       function saveKeys() { rebuildKeymap(); keyState = 0; lsSet('nes-keys', JSON.stringify(binds)); }
-      function openKeys() { keyModalOpen = true; listening = null; keyState = 0; renderKeys(); keyModal.classList.add('open'); }
-      function closeKeys() { keyModalOpen = false; listening = null; keyModal.classList.remove('open'); }
+      function openKeys() { keyModalOpen = true; listening = null; stopPadListen(); keyState = 0; renderKeys(); keyModal.classList.add('open'); }
+      function closeKeys() { keyModalOpen = false; listening = null; stopPadListen(); keyModal.classList.remove('open'); }
       addEventListener('keydown', e => {
         if (!keyModalOpen) return;
+        if (padListening !== null) {
+          e.preventDefault(); e.stopPropagation();
+          if (e.code === 'Delete') { padBinds[padListening] = -1; savePad(); }
+          if (e.code === 'Escape' || e.code === 'Delete') { stopPadListen(); renderKeys(); }
+          return;
+        }
         if (listening) {
           e.preventDefault(); e.stopPropagation();
           if (e.code === 'Escape') { listening = null; renderKeys(); return; }
@@ -1632,17 +1503,14 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       }, true);
       $('btnKeys').addEventListener('click', e => { e.currentTarget.blur(); openKeys(); });
       $('keyClose').addEventListener('click', closeKeys);
-      $('keyDefault').addEventListener('click', () => { binds = DEFAULT_BINDS.map(a => a.slice()); listening = null; saveKeys(); renderKeys(); });
+      $('keyDefault').addEventListener('click', () => { binds = DEFAULT_BINDS.map(a => a.slice()); listening = null; stopPadListen(); padBinds = DEFAULT_PAD.slice(); savePad(); saveKeys(); renderKeys(); });
       keyModal.addEventListener('mousedown', e => { if (e.target === keyModal) closeKeys(); });
 
       function padFromGamepad(g) {
-        if (!g) return 0;
+        if (!g || keyModalOpen) return 0;     // đang mở modal phím thì tay cầm không điều khiển game
         const bt = i => g.buttons[i] && g.buttons[i].pressed;
         let s = 0;
-        if (bt(1) || bt(3)) s |= 1;          // A  (botão leste / norte)
-        if (bt(0) || bt(2)) s |= 2;          // B  (botão sul / oeste)
-        if (bt(8)) s |= 4; if (bt(9)) s |= 8;
-        if (bt(12)) s |= 16; if (bt(13)) s |= 32; if (bt(14)) s |= 64; if (bt(15)) s |= 128;
+        ACTIONS.forEach((a, i) => { if (padBinds[i] >= 0 && bt(padBinds[i])) s |= a[1]; });
         const ax = g.axes[0] || 0, ay = g.axes[1] || 0;
         if (ay < -0.5) s |= 16; if (ay > 0.5) s |= 32; if (ax < -0.5) s |= 64; if (ax > 0.5) s |= 128;
         return s;
@@ -1650,26 +1518,14 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       function localPoll() {
         let g = [];
         try { g = Array.from(navigator.getGamepads ? navigator.getGamepads() : []).filter(Boolean); } catch (e) { }
-        return keyState | touchState | padFromGamepad(g[0]);
+        return compose(keyState | padFromGamepad(g[0]));
       }
       function pollInput() {
         let g = [];
         try { g = Array.from(navigator.getGamepads ? navigator.getGamepads() : []).filter(Boolean); } catch (e) { }
-        nes.pads[0].state = keyState | touchState | padFromGamepad(g[0]);
-        nes.pads[1].state = padFromGamepad(g[1]);
+        nes.pads[0].state = compose(keyState | padFromGamepad(g[0]));
+        nes.pads[1].state = compose(padFromGamepad(g[1]));
       }
-
-      // touch controls
-      if (matchMedia('(pointer: coarse)').matches) document.body.classList.add('coarse');
-      document.querySelectorAll('#touch button').forEach(btn => {
-        const bit = +btn.dataset.b;
-        const down = e => { e.preventDefault(); audio.init(); touchState |= bit; btn.classList.add('on'); try { btn.setPointerCapture(e.pointerId); } catch (_) { } };
-        const up = e => { e.preventDefault(); touchState &= ~bit; btn.classList.remove('on'); };
-        btn.addEventListener('pointerdown', down);
-        btn.addEventListener('pointerup', up);
-        btn.addEventListener('pointercancel', up);
-        btn.addEventListener('contextmenu', e => e.preventDefault());
-      });
 
       // ---- battery saves ----
       let sramKey = null, sramLast = '';
@@ -1733,8 +1589,8 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
           audio.init();
           romName = file.name.replace(/\.(nes|zip)$/i, '');
           loadSram();
-          paused = false; $('btnPause').textContent = 'Tạm dừng';
-          $('btnPause').disabled = false; $('btnReset').disabled = false;
+          paused = false;
+          $('btnReset').disabled = false;
           overlay.classList.add('hidden');
           acc = 0; last = 0;
           document.title = romName + ' — NES Player';
@@ -1764,24 +1620,18 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       // ---- controls ----
       function togglePause() {
         if (!nes.loaded || net.synced || net.syncing || net.spec) return;
-        paused = !paused; $('btnPause').textContent = paused ? 'Tiếp tục' : 'Tạm dừng';
+        paused = !paused;
         if (!paused) { audio.init(); last = 0; }
         showStatus();
       }
-      function doReset() { if (nes.loaded && !net.synced && !net.syncing && !net.spec) { saveSram(); nes.reset(); if (sramKey) loadSram(); paused = false; $('btnPause').textContent = 'Tạm dừng'; showStatus(); } }
+      function doReset() { if (nes.loaded && !net.synced && !net.syncing && !net.spec) { saveSram(); nes.reset(); if (sramKey) loadSram(); paused = false; showStatus(); } }
       function toggleFull() {
         if (document.fullscreenElement) document.exitFullscreen();
         else if (stage.requestFullscreen) stage.requestFullscreen().catch(() => { });
       }
-      $('btnPause').addEventListener('click', e => { e.currentTarget.blur(); togglePause(); });
       $('btnReset').addEventListener('click', e => { e.currentTarget.blur(); doReset(); });
       $('btnFull').addEventListener('click', e => { e.currentTarget.blur(); toggleFull(); });
-      $('chkSmooth').checked = lsGet('nes-smooth', '0') === '1';
-      stage.classList.toggle('smooth', $('chkSmooth').checked);
-      $('chkSmooth').addEventListener('change', e => { stage.classList.toggle('smooth', e.target.checked); lsSet('nes-smooth', e.target.checked ? '1' : '0'); e.target.blur(); });
-      crop = lsGet('nes-crop', '1') === '1'; $('chkCrop').checked = crop;
-      $('chkCrop').addEventListener('change', e => { crop = e.target.checked; lsSet('nes-crop', crop ? '1' : '0'); applyCrop(); e.target.blur(); });
-      applyCrop();
+      crop = true; applyCrop();             // cố định: không làm mịn, cắt viền 8px
 
       // ---- phòng chơi 2 người ----
       // Mỗi người tự chạy giả lập. Khi chỉ có một người, giả lập chạy tự do (không phụ thuộc ai).
@@ -1859,51 +1709,135 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         }
       }
       setInterval(sendPacket, 50);           // gửi lại đều đặn để mất gói cũng được bù, kể cả khi đang đứng chờ
+      // ---- chat voice (WebRTC riêng, tín hiệu 'vsig' qua WebSocket) ----
+      // Như nói chung trong phòng: ai bấm bật mic thì đối phương và các khán giả nghe được ngay, không cần họ bật gì.
+      // Mỗi chiều là một kết nối riêng: 'out' = mic của mình gửi cho đối phương, 'specs' = mic gửi cho từng khán giả (theo id),
+      // 'ins' = tiếng nhận được (khóa 'p' = đối phương, hoặc id người chơi nếu mình là khán giả).
+      // Tin nhắn có k: 's' (từ bên đang gửi: offer + ICE) và 'r' (từ bên nhận: answer + ICE). Khán giả chỉ nghe, không nói.
+      const voice = { on: false, stream: null, out: null, specs: new Map(), ins: new Map(), pres: false };
+      const pendingPlay = new Set();
+      addEventListener('pointerdown', () => { for (const a of [...pendingPlay]) { pendingPlay.delete(a); a.play().catch(() => { }); } }, true);
+      function vSend(o) { o.t = 'vsig'; netSend(o); }
+      function voiceUi() {
+        const b = $('btnVoice'); if (!b) return;
+        b.style.display = net.ws && !net.spec && (net.peer || voice.pres) ? '' : 'none';
+        b.textContent = voice.on ? '🔊' : '🎤';
+        b.title = voice.on ? 'Tắt mic' : 'Bật mic'; b.setAttribute('aria-label', b.title);
+        b.classList.toggle('primary', voice.on);
+      }
+      function closePc(pc) { if (pc) { try { pc.close(); } catch (e) { } } }
+      function voiceCloseOut() { const e = voice.out; voice.out = null; if (e) closePc(e.pc); }
+      function voiceCloseSpec(id) { const e = voice.specs.get(id); voice.specs.delete(id); if (e) closePc(e.pc); }
+      function voiceCloseIn(key) {
+        const e = voice.ins.get(key); voice.ins.delete(key);
+        if (e) { e.audio.srcObject = null; pendingPlay.delete(e.audio); closePc(e.pc); }
+      }
+      function voiceStop(announce) {
+        if (announce && voice.on) { vSend({ off: 1 }); for (const id of voice.specs.keys()) vSend({ off: 1, to: id }); }
+        voice.on = false; voiceCloseOut();
+        for (const id of [...voice.specs.keys()]) voiceCloseSpec(id);
+        for (const k of [...voice.ins.keys()]) voiceCloseIn(k);
+        if (voice.stream) { voice.stream.getTracks().forEach(t => t.stop()); voice.stream = null; }
+        voiceUi();
+      }
+      function voiceCall(to) {                 // gửi mic của mình cho đối phương (to bỏ trống) hoặc một khán giả (to = id)
+        const tag = to === undefined ? {} : { to };
+        if (to === undefined) voiceCloseOut(); else voiceCloseSpec(to);
+        const pc = new RTCPeerConnection({ iceServers: ICE }), ent = { pc, q: [] };
+        if (to === undefined) voice.out = ent; else voice.specs.set(to, ent);
+        const cur = () => (to === undefined ? voice.out : voice.specs.get(to)) === ent;
+        voice.stream.getTracks().forEach(t => pc.addTrack(t, voice.stream));
+        pc.onicecandidate = e => { if (e.candidate && cur()) vSend(Object.assign({ k: 's', c: e.candidate }, tag)); };
+        pc.onconnectionstatechange = () => { if (cur() && pc.connectionState === 'failed' && to === undefined) toast('Voice bị mất kết nối, hãy tắt rồi bật lại mic.'); };
+        pc.createOffer().then(o => pc.setLocalDescription(o)).then(() => vSend(Object.assign({ k: 's', d: pc.localDescription }, tag))).catch(() => { });
+      }
+      async function voiceStart() {
+        if (voice.on) return;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof RTCPeerConnection === 'undefined') {
+          toast('Trình duyệt không hỗ trợ voice (cần mở bằng HTTPS hoặc localhost).'); return;
+        }
+        try {
+          const st = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+          if (!net.ws || net.spec) { st.getTracks().forEach(t => t.stop()); return; }
+          voice.stream = st; voice.on = true; voiceUi(); voiceCall();
+          for (const id of (net.roster && net.roster.specIds) || []) voiceCall(id);   // khán giả đang xem cũng nghe được
+        } catch (e) {
+          toast('Không bật được micro: ' + (e && e.name === 'NotAllowedError' ? 'bạn chưa cấp quyền cho trang.' : (e && e.message) || 'lỗi không rõ'));
+        }
+      }
+      function voicePlay(a) { a.play().catch(() => { pendingPlay.add(a); toast('Bấm vào trang một lần để nghe voice.'); }); }
+      function voiceRoster(ids) { for (const id of [...voice.specs.keys()]) if (!ids.includes(id)) voiceCloseSpec(id); }   // khán giả đã đi/lên chơi
+      function voiceSignal(m) {
+        const fromSpec = m.from !== undefined, key = fromSpec ? m.from : 'p', tag = fromSpec ? { to: m.from } : {};
+        if (m.want) { if (fromSpec && voice.on && !net.spec) voiceCall(m.from); return; }   // khán giả mới vào xin nghe
+        if (m.off) { voiceCloseIn(key); return; }
+        if (m.k === 's') {                     // bên kia gửi mic tới: mình chỉ nhận, không cần bật mic
+          if (m.d && m.d.type === 'offer') {
+            voiceCloseIn(key);
+            const pc = new RTCPeerConnection({ iceServers: ICE }), audio = new Audio(), ent = { pc, q: [], audio };
+            audio.autoplay = true; audio.playsInline = true; voice.ins.set(key, ent);
+            pc.onicecandidate = e => { if (e.candidate && voice.ins.get(key) === ent) vSend(Object.assign({ k: 'r', c: e.candidate }, tag)); };
+            pc.ontrack = e => { audio.srcObject = e.streams[0] || new MediaStream([e.track]); voicePlay(audio); };
+            pc.setRemoteDescription(m.d).then(() => { const q = ent.q; ent.q = []; for (const c of q) pc.addIceCandidate(c).catch(() => { }); return pc.createAnswer(); })
+              .then(a => pc.setLocalDescription(a)).then(() => vSend(Object.assign({ k: 'r', d: pc.localDescription }, tag))).catch(() => { });
+          } else if (m.c) {
+            const ent = voice.ins.get(key);
+            if (ent && ent.pc.remoteDescription) ent.pc.addIceCandidate(m.c).catch(() => { }); else if (ent) ent.q.push(m.c);
+          }
+        } else if (m.k === 'r') {              // bên nhận trả lời kết nối mic của mình
+          const ent = fromSpec ? voice.specs.get(m.from) : voice.out; if (!ent) return;
+          const pc = ent.pc;
+          if (m.d) pc.setRemoteDescription(m.d).then(() => { const q = ent.q; ent.q = []; for (const c of q) pc.addIceCandidate(c).catch(() => { }); }).catch(() => { });
+          else if (m.c) { if (pc.remoteDescription) pc.addIceCandidate(m.c).catch(() => { }); else ent.q.push(m.c); }
+        }
+      }
       // ---- danh sách người trong phòng (người chơi ở trên, khán giả ở dưới) ----
-      let toastT = 0;
-      function toast(t) {
-        const el = $('toast'); el.textContent = t; el.classList.add('on');
-        clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 4000);
+      // Thông báo xếp chồng (tối đa 5 cái), mỗi cái tự tắt sau vài giây; không còn thông báo sau đè mất thông báo trước.
+      function toast(t, kind) {
+        const box = $('toast');
+        const last = box.lastElementChild;
+        if (last && last.textContent === t) return;               // trùng thông báo vừa hiện: bỏ qua
+        const el = document.createElement('div'); el.className = 'toast' + (kind ? ' ' + kind : ''); el.textContent = t;
+        box.appendChild(el);
+        while (box.children.length > 5) box.removeChild(box.firstElementChild);
+        requestAnimationFrame(() => el.classList.add('on'));
+        setTimeout(() => { el.classList.remove('on'); setTimeout(() => el.remove(), 250); }, kind === 'join' ? 6000 : 4000);
       }
       function renderRoster() {
         const el = $('roster'), r = net.roster;
         el.textContent = '';
         if (!net.ws || !r) { el.style.display = 'none'; return; }
-        el.style.display = 'block';
-        const d = document.createElement('div');
-        const b = document.createElement('b'); b.textContent = 'Người chơi:'; d.appendChild(b);
-        r.players.forEach((p, i) => {
-          d.appendChild(document.createTextNode(i ? ' · ' : ' '));
-          const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'P' + (p.slot + 1); d.appendChild(t);
-          const n = document.createElement('span'); n.textContent = 'Player ' + (p.slot + 1) + (p.id === r.me ? ' (bạn)' : '');
-          if (p.id === r.me) n.className = 'me';
-          d.appendChild(n);
-        });
-        el.appendChild(d);
-        if (r.specs > 0) {
-          const v = document.createElement('div');
-          const vb = document.createElement('b'); vb.textContent = 'Khách xem:'; v.appendChild(vb);
-          v.appendChild(document.createTextNode(' ' + r.specs));
-          el.appendChild(v);
+        el.style.display = 'flex';
+        for (let slot = 0; slot < 2; slot++) {            // P1 / P2: xanh lá khi có người, xám khi trống
+          const p = r.players.find(x => x.slot === slot);
+          const b = document.createElement('span');
+          b.className = 'badge' + (p ? ' on' : '') + (p && p.id === r.me ? ' me' : '');
+          b.textContent = 'P' + (slot + 1);
+          b.title = p ? 'Người chơi ' + (slot + 1) + (p.id === r.me ? ' (bạn)' : '') : 'Chỗ người chơi ' + (slot + 1) + ' còn trống';
+          el.appendChild(b);
         }
+        const e = document.createElement('span');        // 👁 số khách đang xem
+        e.className = 'eye'; e.title = r.specs + ' khách đang xem';
+        e.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+        const n = document.createElement('span'); n.textContent = r.specs; e.appendChild(n);
+        el.appendChild(e);
       }
       function onRoster(m) {
         net.roster = { me: m.me, players: Array.isArray(m.players) ? m.players : [], specs: m.specs | 0 };
+        net.roster.specIds = Array.isArray(m.specIds) ? m.specIds : [];
+        voiceRoster(net.roster.specIds);
         renderRoster();
         const e = m.ev; if (!e || e.id === m.me) return;
-        const pl = 'Player ' + ((e.slot | 0) + 1);
-        if (e.k === 'player') toast(pl + ' đã vào chơi cùng bạn');
-        else if (e.k === 'spec') toast('Có khách vào xem (' + net.roster.specs + ' khách xem)');
-        else if (e.k === 'promoted') toast('Một khách xem được vào chơi thay (' + pl + ')');
-        else if (e.k === 'left') toast(e.role === 'spec' ? 'Một khách xem đã rời phòng' : pl + ' đã rời phòng');
+        const pl = 'Player ' + ((e.slot | 0) + 1), n = net.roster.specs;
+        if (e.k === 'player') toast('🎮 ' + pl + ' đã vào chơi' + (net.spec ? '' : ' cùng bạn'), 'join');
+        else if (e.k === 'spec') toast('👀 Có khách vào xem (hiện có ' + n + ' khách xem)', 'join');
+        else if (e.k === 'promoted') toast('🎮 Một khách xem đã vào chơi thay (' + pl + ')', 'join');
+        else if (e.k === 'left') toast(e.role === 'spec' ? '👋 Một khách xem đã rời phòng (còn ' + n + ' khách xem)' : '👋 ' + pl + ' đã rời phòng');
       }
       function netSend(o) { if (net.ws && net.ws.readyState === 1) net.ws.send(JSON.stringify(o)); }
-      function roomMsg(t) { $('roomMsg').textContent = t; }
+      function roomMsg(t) { toast(t); }   // thông báo trạng thái phòng hiện dạng toast
       function roomUi(link) {
-        $('roomIdle').style.display = link ? 'none' : '';
-        $('roomBusy').style.display = link ? '' : 'none';
         $('roomLink').value = link || '';
-        $('roomLeave').style.display = net.ws ? '' : 'none';
         refreshUi();
       }
       // trang chủ: chưa vào phòng -> tạo/vào phòng; chủ phòng -> chọn ROM; người vào -> chờ nhận game
@@ -1916,11 +1850,13 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         $('lobbyWaitTitle').textContent = net.spec ? 'Bạn đang là khán giả' : 'Đang chờ vào phòng…';
         $('lobbyWaitSub').textContent = net.spec ? 'Game sẽ hiện ra khi nhận xong dữ liệu. Có người chơi thoát thì bạn được vào chơi thay.' : 'Game sẽ tự chạy khi chủ phòng nạp ROM.';
         $('btnLeave').style.display = inRoom ? '' : 'none';
+        $('btnLink').style.display = inRoom && !net.spec ? '' : 'none';
+        voiceUi();
         renderRoster();
       }
-      function enableButtons() { $('btnPause').disabled = !nes.loaded; $('btnReset').disabled = !nes.loaded; }
+      function enableButtons() { $('btnReset').disabled = !nes.loaded; }
       function dropPeer() {                 // đối phương không còn: tiếp tục chạy một mình
-        rtcClose(); net.link = null;
+        rtcClose(); net.link = null; voice.pres = false; voiceStop(false);
         if (net.rb) { try { net.rb.resolve(); } catch (e) { } net.rb = null; }
         net.peer = false; net.existing = false; net.synced = false; net.syncing = false; net.sending = false;
         net.catchup = false; net.joinAt = null; net.localIn = {}; net.remoteIn = {}; net.rx = null;
@@ -1941,7 +1877,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       }
       function startSync() {
         if (!net.ws || !net.peer || !nes.loaded || !lastRom || net.synced) return;
-        paused = false; $('btnPause').textContent = 'Tạm dừng';
+        paused = false;
         net.syncing = true; net.sending = false; net.joinAt = null; net.localIn = {}; net.remoteIn = {};
         const snap = takeSnapshot(nes);
         netSend({ t: 'rom', name: romName, size: lastRom.length });
@@ -1961,7 +1897,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         net.link = new InputLink(J + net.rb.delay);
         net.localIn = {}; net.remoteIn = {};
         roomMsg('Đang chơi — bạn là người chơi ' + (net.slot + 1) + '.');
-        closeRoom(); showStatus(); flushSpecs();
+        showStatus(); flushSpecs();
       }
       // --- người chơi cũ nhất: gửi ROM + trạng thái cho khán giả (cùng phím chưa dùng của hai bên) ---
       function feedSpectator(id) {
@@ -2051,14 +1987,14 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             history.replaceState(null, '', BASE + m.room);
             roomUi(location.origin + BASE + m.room);
             roomMsg('Gửi liên kết này cho bạn bè. Hãy chọn ROM để bắt đầu chơi, họ vào lúc nào cũng được.');
-            openRoom();
           } else if (m.t === 'joined') {
-            net.slot = m.slot; net.host = false;
+            net.slot = m.slot; net.host = false; voice.pres = true; voiceUi();
             if (wantRoom) history.replaceState(null, '', BASE + wantRoom);
             roomUi(location.href);
             roomMsg('Đã vào phòng, đang chờ người trong phòng gửi game…');
           } else if (m.t === 'peerjoined') {
-            net.peer = true; net.existing = true;
+            net.peer = true; net.existing = true; voice.pres = true; voiceUi();
+            if (voice.on) voiceCall();                 // mic đã bật từ trước: gửi cho người vừa vào
             rtcStart(true);                          // người ở lại trong phòng là bên gọi (offer) kết nối P2P
             if (nes.loaded && lastRom) { roomMsg('Có người vào phòng, đang gửi game cho họ…'); startSync(); }
             else roomMsg('Có người vào phòng. Hãy nạp ROM để cùng chơi.');
@@ -2066,7 +2002,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             const wasLock = net.synced;
             dropPeer(); showStatus();
             roomMsg(wasLock ? 'Đối phương đã rời phòng, bạn tiếp tục chơi một mình.' : 'Người kia đã rời phòng.');
-            if (wasLock) { $('btnPause').disabled = !nes.loaded; $('btnReset').disabled = !nes.loaded; }
+            if (wasLock) { $('btnReset').disabled = !nes.loaded; }
           } else if (m.t === 'rom') {
             if (net.spec) net.specReady = false;
             else {
@@ -2091,7 +2027,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
               for (const s of net.specIn) for (const k in s) if (+k < net.f) delete s[k];
               net.specReady = true; acc = 0; last = 0;
               roomMsg('Bạn đang xem với tư cách khán giả. Khi có người chơi thoát, bạn sẽ được vào chơi thay.');
-              closeRoom(); showStatus();
+              showStatus();
               return;
             }
             net.f = g.rx.f; net.remoteIn = {};
@@ -2110,12 +2046,15 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             onRoster(m);
           } else if (m.t === 'sig') {
             rtcSignal(m);
+          } else if (m.t === 'vsig') {
+            voiceSignal(m);
           } else if (m.t === 'specjoined') {          // có khán giả mới: gửi game cho họ (khi đã đồng bộ)
             net.specQ.add(m.id); flushSpecs();
           } else if (m.t === 'spectating') {
             net.spec = true; net.specReady = false; net.host = false; net.slot = 0;
             net.specIn = [{}, {}]; net.specCnt = 0;
             if (wantRoom) history.replaceState(null, '', BASE + wantRoom);
+            vSend({ want: 1 });                      // xin nghe voice của hai người chơi (ai đang bật mic sẽ gọi lại)
             roomUi(location.href);
             roomMsg('Phòng đã đủ 2 người. Bạn là khán giả, đang chờ nhận game…');
           } else if (m.t === 'resync') {              // người chơi đổi: trạng thái cũ không còn khớp, chờ gửi lại
@@ -2123,46 +2062,44 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             roomMsg('Có thay đổi người chơi, đang đồng bộ lại…');
           } else if (m.t === 'promoted') {            // có người chơi thoát: khán giả này được vào thay
             const ready = net.specReady && nes.loaded;
+            voiceStop(false);                          // lên chơi: bỏ các kết nối nghe voice của khán giả
             net.spec = false; net.specReady = false; net.specIn = [{}, {}]; net.rx = null;
             net.slot = m.slot; net.host = !!m.solo;
             if (m.solo) { net.synced = false; net.syncing = false; net.rb = null; }
             roomMsg(m.solo ? 'Bạn đã vào chơi thay.' : 'Bạn đã được vào chơi thay, đang nhận game…');
-            if (m.solo && ready) { closeRoom(); showStatus(); }
+            if (m.solo && ready) { showStatus(); }
             refreshUi();
           } else if (m.t === 'error') {
             netTeardown(); history.replaceState(null, '', BASE);
-            roomMsg((m.msg || 'Lỗi') + ' Bạn có thể tạo phòng mới.'); openRoom();
+            roomMsg((m.msg || 'Lỗi') + ' Bạn có thể tạo phòng mới.');
           }
         };
       }
-      const roomModal = $('roomModal');
-      function openRoom() { keyState = 0; roomModal.classList.add('open'); }
-      function closeRoom() { roomModal.classList.remove('open'); }
-      $('roomClose').addEventListener('click', closeRoom);
       // rời phòng -> quay về trang chủ (tải lại trang để dừng game đang chạy)
       const leaveRoom = () => { netTeardown(); location.replace(BASE); };
-      $('roomLeave').addEventListener('click', leaveRoom);
+      $('btnVoice').addEventListener('click', e => { e.currentTarget.blur(); if (voice.on) voiceStop(true); else voiceStart(); });
       $('btnLeave').addEventListener('click', e => { e.currentTarget.blur(); leaveRoom(); });
-      $('roomCreate').addEventListener('click', () => netConnect({ t: 'create' }));
       $('lobbyCreate').addEventListener('click', () => netConnect({ t: 'create' }));
       function lobbyJoin() {
         const m = $('lobbyCode').value.trim().match(/([A-Za-z0-9]{4,12})\/?$/);
         if (!m) { errEl.textContent = 'Hãy nhập mã phòng (4–12 ký tự) hoặc dán liên kết phòng.'; return; }
         errEl.textContent = '';
-        openRoom(); netConnect({ t: 'join', room: m[1] });
+        netConnect({ t: 'join', room: m[1] });
       }
       $('lobbyJoin').addEventListener('click', lobbyJoin);
       $('lobbyCode').addEventListener('keydown', e => { if (e.key === 'Enter') lobbyJoin(); });
-      $('roomCopy').addEventListener('click', () => {
-        const el = $('roomLink'); el.select();
-        try { navigator.clipboard.writeText(el.value); } catch (e) { document.execCommand('copy'); }
-        roomMsg('Đã sao chép liên kết.');
-      });
-      roomModal.addEventListener('mousedown', e => { if (e.target === roomModal) closeRoom(); });
+      function copyRoomLink() {
+        const link = $('roomLink').value || location.href;
+        const done = () => toast('Đã sao chép liên kết phòng.');
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(done, () => toast(link));
+        else { const el = $('roomLink'); el.select(); try { document.execCommand('copy'); done(); } catch (e) { toast(link); } }
+      }
+      $('roomCopy').addEventListener('click', copyRoomLink);
+      $('btnLink').addEventListener('click', e => { e.currentTarget.blur(); copyRoomLink(); });
       roomUi();
       // người được mời: mở /:id là tự vào phòng
       const roomPath = location.pathname.startsWith(BASE) ? location.pathname.slice(BASE.length).match(/^([A-Za-z0-9]{4,12})\/?$/) : null;
-      if (roomPath) { openRoom(); netConnect({ t: 'join', room: roomPath[1] }); }
+      if (roomPath) { netConnect({ t: 'join', room: roomPath[1] }); }
 
       // ---- main loop ----
       const FRAME_MS = 1000 / 60.0988;

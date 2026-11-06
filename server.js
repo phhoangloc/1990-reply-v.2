@@ -75,7 +75,15 @@ function newCode() {
 // Danh sách người trong phòng: người chơi (P1, P2) và số khách xem. Gửi cho tất cả mỗi khi có thay đổi, kèm sự kiện vừa xảy ra (ev).
 function announce(r, ev) {
   const players = r.players.slice().sort((a, b) => a.slot - b.slot).map(p => ({ id: p.id, slot: p.slot }));
-  for (const c of [...r.players, ...r.specs]) send(c, { t: 'roster', me: c.id, players, specs: r.specs.length, ev });
+  const specIds = r.specs.map(s => s.id);                 // để người chơi biết gọi voice cho khán giả nào
+  for (const c of [...r.players, ...r.specs]) send(c, { t: 'roster', me: c.id, players, specs: r.specs.length, specIds, ev });
+}
+// voice: người chơi <-> khán giả (nhắm đích bằng m.to = id); server gắn from = id người gửi, không tin from do client gửi
+function vrelay(ws, m) {
+  const r = ws.room && rooms.get(ws.room); if (!r) return;
+  const out = Object.assign({}, m, { from: ws.id }); delete out.to;
+  const targets = ws.spec ? r.players.filter(p => m.to === undefined || p.id === m.to) : r.specs.filter(s => s.id === m.to);
+  for (const t of targets) send(t, out);
 }
 function send(ws, obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
 function peerOf(ws) {
@@ -119,7 +127,7 @@ function leave(ws) {
   fillSeats(r);                                           // sau đó mới báo khán giả vào chơi thay, để thông báo cuối cùng là "vào chơi thay"
   if (!r.players.length && !r.specs.length) rooms.delete(code);
 }
-const RELAY = new Set(['rom', 'romend', 'snap', 'snapend', 'ready', 'go', 'in', 'sig']); // 'sig': signaling WebRTC giữa hai người chơi
+const RELAY = new Set(['rom', 'romend', 'snap', 'snapend', 'ready', 'go', 'in', 'sig', 'vsig']); // 'sig': signaling WebRTC phím; 'vsig': signaling chat voice (giữa hai người chơi)
 const FEED = new Set(['rom', 'romend', 'snap', 'snapend']); // gửi riêng cho 1 khán giả khi người chơi đang "feed"
 
 const wss = new WebSocketServer({ server, path: WS_PATH, maxPayload: 1 << 20 });
@@ -144,6 +152,7 @@ wss.on('connection', ws => {
     }
     let m; try { m = JSON.parse(raw); } catch { return; }
     if (!m || typeof m.t !== 'string') return;
+    if (m.t === 'vsig') delete m.from;
     if (m.t === 'create') {
       leave(ws);
       const code = newCode();
@@ -171,7 +180,8 @@ wss.on('connection', ws => {
         announce(r, { k: 'player', id: ws.id, slot: ws.slot });
       }
     } else if (ws.spec) {
-      if (m.t === 'leave') leave(ws);                         // khán giả chỉ được rời phòng
+      if (m.t === 'leave') leave(ws);                         // khán giả chỉ được rời phòng (và nhận/trả lời voice của người chơi)
+      else if (m.t === 'vsig') vrelay(ws, m);
     } else if (m.t === 'feed') {
       const r = ws.room && rooms.get(ws.room);
       ws.feeding = true; ws.feedTo = (r && r.specs.find(s => s.id === m.id)) || null;
@@ -181,6 +191,8 @@ wss.on('connection', ws => {
     } else if (m.t === 'sin') {                               // phím đã đi thẳng P2P giữa hai người chơi: chỉ báo cho khán giả
       const r = ws.room && rooms.get(ws.room);
       if (r) for (const s of r.specs) send(s, { t: 'in', f: m.f, v: m.v, s: ws.slot });
+    } else if (m.t === 'vsig' && m.to !== undefined) {        // người chơi gửi voice cho một khán giả
+      vrelay(ws, m);
     } else if (RELAY.has(m.t)) {
       if (ws.feeding && FEED.has(m.t)) return send(ws.feedTo, m);
       if (m.t === 'in') {                                     // khán giả nhận phím của cả hai người chơi
