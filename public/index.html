@@ -1802,7 +1802,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       // Khi có người thứ hai vào, người đang chơi gửi ROM + ảnh chụp trạng thái; người mới tua nhanh cho
       // kịp rồi hai bên chạy lockstep. Ai rời đi thì người còn lại tiếp tục chơi với trạng thái hiện tại.
       const BASE = document.querySelector('meta[name=base-route]')?.content || '/';
-      const NET_DELAY = 3;                 // số frame đệm để bù độ trễ mạng
+      const NET_DELAY = 6;                 // số frame đệm để bù độ trễ mạng (6 frame ≈ 100ms, chịu được ping/jitter cao hơn)
       const JOIN_AHEAD = 45;               // số frame chừa lại để người mới bắt kịp
       let lastRom = null;
       const net = {
