@@ -359,8 +359,22 @@
       font-size: 20px
     }
 
-    .ab button:first-child {
+    .abcol {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px
+    }
+
+    .abcol:first-child {
       margin-top: 34px
+    }
+
+    .ab button.turbo {
+      width: 52px;
+      height: 52px;
+      font-size: 10px;
+      font-weight: 600
     }
     /* modal điều khiển */
     .modal { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px }
@@ -371,7 +385,15 @@
     .modal table { width: 100%; border-collapse: collapse }
     .modal td { padding: 5px 4px; border-bottom: 1px solid var(--line) }
     .modal td:first-child { color: var(--muted) }
-    .modal td button.bind { min-width: 92px; font: 13px ui-monospace, Consolas, monospace }
+    #keyModal .box { max-width: 620px }
+    .peer { position: fixed; top: 12px; right: 12px; width: min(340px, 62vw); z-index: 90; display: none; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: 0 6px 24px rgba(0,0,0,.5) }
+    .peer.open { display: block }
+    .peer .peerHead { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 6px 8px; font-size: 12px; color: var(--muted) }
+    .peer .peerHead button { padding: 3px 8px; font-size: 12px }
+    .peer video { width: 100%; aspect-ratio: 8 / 7; background: #000; display: block; image-rendering: pixelated }
+    .peer .peerMsg { padding: 4px 8px; font-size: 12px; color: var(--muted); min-height: 1em }
+    .modal th { font-size: 12px; font-weight: 600; color: var(--muted); padding: 4px; text-align: center; border-bottom: 1px solid var(--line) }
+    .modal td button.bind { min-width: 78px; font: 13px ui-monospace, Consolas, monospace }
     .modal td button.bind.listening { background: var(--accent); border-color: var(--accent); color: #fff }
     .modal .actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 14px }
     #roomLink { flex: 1; min-width: 0; background: var(--panel2); border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 6px 10px; font: 14px ui-monospace, Consolas, monospace }
@@ -412,6 +434,7 @@
 
     <div class="toolbar">
       <button class="primary" id="btnLoad" type="button" style="display:none">Nạp ROM</button>
+      <button id="btnPeerView" type="button" style="display:none">Xem màn hình đối phương</button>
       <button id="btnPause" type="button" disabled>Tạm dừng</button>
       <button id="btnReset" type="button" disabled>Khởi động lại</button>
       <span class="sep"></span>
@@ -432,7 +455,10 @@
         <span></span><button data-b="32">▼</button><span></span>
       </div>
       <div class="mid"><button data-b="4">SELECT</button><button data-b="8">START</button></div>
-      <div class="ab"><button data-b="2">B</button><button data-b="1">A</button></div>
+      <div class="ab">
+        <div class="abcol"><button class="turbo" data-b="512">TURBO B</button><button data-b="2">B</button></div>
+        <div class="abcol"><button class="turbo" data-b="256">TURBO A</button><button data-b="1">A</button></div>
+      </div>
     </div>
 
     <details class="help">
@@ -482,11 +508,20 @@
   </div>
   <input type="file" id="file" accept=".nes,.zip,application/zip" hidden>
 
+  <div class="peer" id="peerPanel">
+    <div class="peerHead"><span>Màn hình đối phương</span><span><button type="button" id="peerMute">Tắt tiếng</button> <button type="button" id="peerClose">Đóng</button></span></div>
+    <video id="peerVideo" autoplay playsinline></video>
+    <div class="peerMsg" id="peerMsg"></div>
+  </div>
+
   <div class="modal" id="keyModal" role="dialog" aria-modal="true" aria-labelledby="keyTitle">
     <div class="box">
-      <h2 id="keyTitle">Thay đổi phím điều khiển</h2>
-      <p class="hint">Bấm vào một ô rồi nhấn phím mới. <kbd>Esc</kbd> để hủy, <kbd>Delete</kbd> để xóa phím.</p>
-      <table><tbody id="keyRows"></tbody></table>
+      <h2 id="keyTitle">Thay đổi phím / nút điều khiển</h2>
+      <p class="hint">Bấm vào một ô rồi nhấn phím (bàn phím) hoặc nút (tay cầm) mới. <kbd>Esc</kbd> để hủy, <kbd>Delete</kbd> để xóa. Cần analog trái luôn dùng để di chuyển.</p>
+      <table>
+        <thead><tr><th></th><th>Bàn phím</th><th>Tay cầm</th></tr></thead>
+        <tbody id="keyRows"></tbody>
+      </table>
       <div class="actions">
         <button type="button" id="keyDefault">Mặc định</button>
         <button type="button" class="primary" id="keyClose">Xong</button>
@@ -1356,7 +1391,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
 
       // ---- audio ----
       const audio = {
-        ctx: null, gain: null, node: null,
+        ctx: null, gain: null, node: null, dest: null,
         init() {
           if (this.ctx) { if (this.ctx.state !== 'running') this.ctx.resume(); return; }
           try {
@@ -1370,6 +1405,13 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             this.setVol();
           } catch (e) { console.warn('Audio không khả dụng:', e); }
         },
+        // track âm thanh game (lấy trước bộ chỉnh âm lượng/tắt tiếng cục bộ) để gửi qua WebRTC
+        streamTrack() {
+          this.init();
+          if (!this.ctx || !this.node) return null;
+          if (!this.dest) { this.dest = this.ctx.createMediaStreamDestination(); this.node.connect(this.dest); }
+          return this.dest.stream.getAudioTracks()[0] || null;
+        },
         setVol() { if (this.gain) this.gain.gain.value = muted ? 0 : $('vol').value / 100; }
       };
       $('vol').value = lsGet('nes-vol', '70');
@@ -1380,17 +1422,30 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       // ---- input ----
       const ACTIONS = [
         ['Lên', 16], ['Xuống', 32], ['Trái', 64], ['Phải', 128],
-        ['Nút A', 1], ['Nút B', 2], ['Select', 4], ['Start', 8]
+        ['Nút A', 1], ['Nút B', 2], ['Select', 4], ['Start', 8],
+        ['Turbo A', 256], ['Turbo B', 512]
       ];
       const DEFAULT_BINDS = [
-        ['ArrowUp', 'KeyW'], ['ArrowDown', 'KeyS'], ['ArrowLeft', 'KeyA'], ['ArrowRight', 'KeyD'],
-        ['KeyX', 'KeyK'], ['KeyZ', 'KeyJ'], ['ShiftLeft', 'Backspace'], ['Enter', '']
+        ['ArrowUp', ''], ['ArrowDown', ''], ['ArrowLeft', ''], ['ArrowRight', ''],
+        ['KeyX', ''], ['KeyZ', ''], ['ShiftLeft', ''], ['Enter', ''],
+        ['KeyV', ''], ['KeyC', '']
       ];
       const RESERVED = ['Space', 'KeyP', 'KeyR', 'KeyM', 'KeyF', 'Escape'];
       let binds = DEFAULT_BINDS.map(a => a.slice());
       try {
         const sv = JSON.parse(lsGet('nes-keys', 'null'));
-        if (Array.isArray(sv) && sv.length === ACTIONS.length) binds = sv.map(a => [String(a[0] || ''), String(a[1] || '')]);
+        if (Array.isArray(sv) && sv.length >= 8) binds = DEFAULT_BINDS.map((d, i) => sv[i] ? [String(sv[i][0] || ''), ''] : d.slice());
+      } catch (e) { }
+      // nút tay cầm theo chỉ số Gamepad API (-1 = trống), mỗi hành động có 2 ô
+      const DEFAULT_PAD = [
+        [12, -1], [13, -1], [14, -1], [15, -1],
+        [1, -1], [0, -1], [8, -1], [9, -1],
+        [5, -1], [4, -1]                    // Turbo A = RB, Turbo B = LB
+      ];
+      let padBinds = DEFAULT_PAD.map(a => a.slice());
+      try {
+        const sp = JSON.parse(lsGet('nes-pad', 'null'));
+        if (Array.isArray(sp) && sp.length >= 8) padBinds = DEFAULT_PAD.map((d, i) => sp[i] ? [Number.isInteger(sp[i][0]) ? sp[i][0] : -1, -1] : d.slice());
       } catch (e) { }
       let KEYMAP = {};
       function rebuildKeymap() {
@@ -1431,20 +1486,47 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       }
       function renderKeys() {
         const tb = $('keyRows'); tb.textContent = '';
-        ACTIONS.forEach((a, i) => {
+        // thứ tự hiển thị: Turbo A nằm trên A, Turbo B nằm trên B (dữ liệu lưu vẫn theo chỉ số ACTIONS)
+        [0, 1, 2, 3, 8, 4, 9, 5, 6, 7].forEach(i => {
+          const a = ACTIONS[i];
           const tr = document.createElement('tr');
           const td = document.createElement('td'); td.textContent = a[0]; tr.appendChild(td);
-          for (let j = 0; j < 2; j++) {
+          for (const kind of ['k', 'p']) for (let j = 0; j < 1; j++) {
             const t = document.createElement('td'), b = document.createElement('button');
-            b.type = 'button'; b.className = 'bind'; b.textContent = keyLabel(binds[i][j]);
-            b.addEventListener('click', () => { listening = [i, j]; renderKeys(); });
-            if (listening && listening[0] === i && listening[1] === j) { b.classList.add('listening'); b.textContent = 'Nhấn phím…'; }
+            b.type = 'button'; b.className = 'bind';
+            b.textContent = kind === 'k' ? keyLabel(binds[i][j]) : padLabel(padBinds[i][j]);
+            b.addEventListener('click', () => { startListen([i, j, kind]); });
+            if (listening && listening[0] === i && listening[1] === j && listening[2] === kind) {
+              b.classList.add('listening'); b.textContent = kind === 'k' ? 'Nhấn phím…' : 'Nhấn nút…';
+            }
             t.appendChild(b); tr.appendChild(t);
           }
           tb.appendChild(tr);
         });
       }
-      function saveKeys() { rebuildKeymap(); keyState = 0; lsSet('nes-keys', JSON.stringify(binds)); }
+      const PAD_NAMES = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'Back', 'Start', 'L3', 'R3', '↑', '↓', '←', '→', 'Home'];
+      function padLabel(n) { return n < 0 ? '—' : (PAD_NAMES[n] ? PAD_NAMES[n] + ' (' + n + ')' : 'Nút ' + n); }
+      // lắng nghe nút tay cầm: bỏ qua các nút đang giữ lúc bắt đầu, chỉ nhận nút bấm mới
+      function startListen(l) {
+        listening = l; renderKeys();
+        if (l[2] !== 'p') return;
+        const held = new Set();
+        getPads().forEach(g => g.buttons.forEach((b, n) => { if (b.pressed || b.value > 0.5) held.add(n); }));
+        const tick = () => {
+          if (listening !== l) return;
+          const now = new Set();
+          getPads().forEach(g => g.buttons.forEach((b, n) => { if (b.pressed || b.value > 0.5) now.add(n); }));
+          for (const n of held) if (!now.has(n)) held.delete(n);
+          for (const n of now) if (!held.has(n)) {
+            padBinds.forEach(p => { for (let k = 0; k < 2; k++) if (p[k] === n) p[k] = -1; });
+            padBinds[l[0]][l[1]] = n;
+            listening = null; saveKeys(); renderKeys(); return;
+          }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+      function saveKeys() { rebuildKeymap(); keyState = 0; lsSet('nes-keys', JSON.stringify(binds)); lsSet('nes-pad', JSON.stringify(padBinds)); }
       function openKeys() { keyModalOpen = true; listening = null; keyState = 0; renderKeys(); keyModal.classList.add('open'); }
       function closeKeys() { keyModalOpen = false; listening = null; keyModal.classList.remove('open'); }
       addEventListener('keydown', e => {
@@ -1452,7 +1534,11 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         if (listening) {
           e.preventDefault(); e.stopPropagation();
           if (e.code === 'Escape') { listening = null; renderKeys(); return; }
-          const [i, j] = listening;
+          const [i, j, kind] = listening;
+          if (kind === 'p') {
+            if (e.code === 'Delete') { padBinds[i][j] = -1; listening = null; saveKeys(); renderKeys(); }
+            return;
+          }
           if (e.code === 'Delete') { binds[i][j] = ''; }
           else {
             if (RESERVED.includes(e.code)) { listening = null; renderKeys(); return; }
@@ -1464,32 +1550,63 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       }, true);
       $('btnKeys').addEventListener('click', e => { e.currentTarget.blur(); openKeys(); });
       $('keyClose').addEventListener('click', closeKeys);
-      $('keyDefault').addEventListener('click', () => { binds = DEFAULT_BINDS.map(a => a.slice()); listening = null; saveKeys(); renderKeys(); });
+      $('keyDefault').addEventListener('click', () => { binds = DEFAULT_BINDS.map(a => a.slice()); padBinds = DEFAULT_PAD.map(a => a.slice()); listening = null; saveKeys(); renderKeys(); });
       keyModal.addEventListener('mousedown', e => { if (e.target === keyModal) closeKeys(); });
 
+      // ---- tay cầm (Gamepad API) ----
+      // Bố cục chuẩn: A/X -> nút A, B/Y -> nút B; Back/Select, Start; D-pad hoặc cần trái.
+      // Tay cầm không chuẩn: dùng thêm trục mũi tên (hat) ở axes[9].
+      const PAD_DEAD = 0.45;
+      function getPads() {
+        let all = [];
+        try { all = Array.from(navigator.getGamepads ? navigator.getGamepads() : []); } catch (e) { }
+        return all.filter(g => g && g.connected);
+      }
       function padFromGamepad(g) {
         if (!g) return 0;
-        const bt = i => g.buttons[i] && g.buttons[i].pressed;
+        const bt = i => { const b = i >= 0 && g.buttons[i]; return !!b && (b.pressed || b.value > 0.5); };
+        if (keyModalOpen) return 0;         // đang gán nút: không cho tay cầm điều khiển game
         let s = 0;
-        if (bt(1) || bt(3)) s |= 1;          // A  (botão leste / norte)
-        if (bt(0) || bt(2)) s |= 2;          // B  (botão sul / oeste)
-        if (bt(8)) s |= 4; if (bt(9)) s |= 8;
-        if (bt(12)) s |= 16; if (bt(13)) s |= 32; if (bt(14)) s |= 64; if (bt(15)) s |= 128;
+        for (let i = 0; i < ACTIONS.length; i++) if (bt(padBinds[i][0]) || bt(padBinds[i][1])) s |= ACTIONS[i][1];
+        if (g.mapping !== 'standard') {
+          const h = g.axes[9];               // hat: -1 lên, -0.43 phải, 0.14 xuống, 0.71 trái
+          if (typeof h === 'number' && Math.abs(h) <= 1) {
+            const step = Math.round((h + 1) * 3.5);
+            if (step === 0 || step === 1 || step === 7) s |= 16;
+            if (step === 1 || step === 2 || step === 3) s |= 128;
+            if (step === 3 || step === 4 || step === 5) s |= 32;
+            if (step === 5 || step === 6 || step === 7) s |= 64;
+          }
+        }
         const ax = g.axes[0] || 0, ay = g.axes[1] || 0;
-        if (ay < -0.5) s |= 16; if (ay > 0.5) s |= 32; if (ax < -0.5) s |= 64; if (ax > 0.5) s |= 128;
+        if (ay < -PAD_DEAD) s |= 16; if (ay > PAD_DEAD) s |= 32;
+        if (ax < -PAD_DEAD) s |= 64; if (ax > PAD_DEAD) s |= 128;
+        if (s) audio.init();                 // bấm tay cầm cũng mở khóa âm thanh
         return s;
       }
+      // turbo: giữ nút Turbo thì A/B tự nhấn-nhả, đổi trạng thái mỗi 2 frame (~15 lần/giây)
+      let turboN = 0;
+      const turboPhase = () => (((++turboN) >> 1) & 1) === 0;
+      function resolveTurbo(v, on) {
+        let r = v & 255;
+        if (on) { if (v & 256) r |= 1; if (v & 512) r |= 2; }
+        return r;
+      }
       function localPoll() {
-        let g = [];
-        try { g = Array.from(navigator.getGamepads ? navigator.getGamepads() : []).filter(Boolean); } catch (e) { }
-        return keyState | touchState | padFromGamepad(g[0]);
+        return resolveTurbo(keyState | touchState | padFromGamepad(getPads()[0]), turboPhase());
       }
       function pollInput() {
-        let g = [];
-        try { g = Array.from(navigator.getGamepads ? navigator.getGamepads() : []).filter(Boolean); } catch (e) { }
-        nes.pads[0].state = keyState | touchState | padFromGamepad(g[0]);
-        nes.pads[1].state = padFromGamepad(g[1]);
+        const g = getPads(), on = turboPhase();
+        nes.pads[0].state = resolveTurbo(keyState | touchState | padFromGamepad(g[0]), on);
+        nes.pads[1].state = resolveTurbo(padFromGamepad(g[1]), on);
       }
+      function padNote(t) {
+        const old = statusEl.textContent;
+        statusEl.textContent = t;
+        setTimeout(() => { if (statusEl.textContent === t) statusEl.textContent = old; }, 2500);
+      }
+      addEventListener('gamepadconnected', e => padNote('Đã kết nối tay cầm: ' + e.gamepad.id.slice(0, 40)));
+      addEventListener('gamepaddisconnected', () => padNote('Tay cầm đã ngắt kết nối'));
 
       // touch controls
       if (matchMedia('(pointer: coarse)').matches) document.body.classList.add('coarse');
@@ -1649,12 +1766,14 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         $('lobbyWaitTitle').textContent = net.spec ? 'Bạn đang là khán giả' : 'Đang chờ vào phòng…';
         $('lobbyWaitSub').textContent = net.spec ? 'Game sẽ hiện ra khi nhận xong dữ liệu. Có người chơi thoát thì bạn được vào chơi thay.' : 'Game sẽ tự chạy khi chủ phòng nạp ROM.';
         $('btnLeave').style.display = inRoom ? '' : 'none';
+        $('btnPeerView').style.display = inRoom && net.peer && !net.spec ? '' : 'none';
       }
       function enableButtons() { $('btnPause').disabled = !nes.loaded; $('btnReset').disabled = !nes.loaded; }
       function dropPeer() {                 // đối phương không còn: tiếp tục chạy một mình
         net.peer = false; net.existing = false; net.synced = false; net.syncing = false; net.sending = false;
         net.catchup = false; net.joinAt = null; net.localIn = {}; net.remoteIn = {}; net.rx = null;
         net.specQ.clear();
+        rtcClose();
         refreshUi();
       }
       function netTeardown() {
@@ -1800,6 +1919,74 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         overlay.classList.add('hidden'); document.title = romName + ' — NES Player';
         paused = false; errEl.textContent = ''; enableButtons();
       }
+      // --- truyền hình ảnh + âm thanh game giữa hai người chơi qua WebRTC ---
+      // Tín hiệu (offer/answer/ice) đi qua WebSocket của phòng; hình/tiếng đi thẳng giữa hai trình duyệt.
+      // Bên bấm "Xem màn hình đối phương" là người xem (pc 'v'); bên kia nhận yêu cầu rồi phát canvas + âm thanh game (pc 'p').
+      const RTC_CFG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+      const rtc = { view: null, pub: null, viewQ: [], pubQ: [] };
+      const peerPanel = $('peerPanel'), peerVideo = $('peerVideo'), peerMsg = $('peerMsg');
+      const rtcSend = (k, extra) => netSend(Object.assign({ t: 'rtc', k }, extra));
+      function rtcNewPc(role) {
+        const pc = new RTCPeerConnection(RTC_CFG);
+        pc.onicecandidate = e => { if (e.candidate) rtcSend('ice', { d: role, c: e.candidate }); };
+        pc.onconnectionstatechange = () => {
+          if (role === 'v' && rtc.view === pc) {
+            if (pc.connectionState === 'failed') peerMsg.textContent = 'Không kết nối được tới đối phương.';
+            else if (pc.connectionState === 'disconnected') peerMsg.textContent = 'Mất kết nối, đang thử lại…';
+          }
+        };
+        return pc;
+      }
+      function rtcStopWatch(notify) {
+        if (rtc.view) { try { rtc.view.close(); } catch (e) { } rtc.view = null; }
+        rtc.viewQ = []; peerVideo.srcObject = null; peerPanel.classList.remove('open');
+        if (notify) rtcSend('stop');
+      }
+      function rtcStopPub() { if (rtc.pub) { try { rtc.pub.close(); } catch (e) { } rtc.pub = null; } rtc.pubQ = []; }
+      function rtcClose() { rtcStopWatch(false); rtcStopPub(); }
+      function rtcStartWatch() {
+        if (!net.ws || !net.peer || net.spec || typeof RTCPeerConnection === 'undefined') return;
+        audio.init();                          // thao tác của người dùng -> được phép phát tiếng
+        rtcStopWatch(false);
+        const pc = rtc.view = rtcNewPc('v');
+        pc.ontrack = e => { peerVideo.srcObject = e.streams[0]; peerVideo.play().catch(() => { }); };
+        peerMsg.textContent = 'Đang kết nối…'; peerPanel.classList.add('open');
+        rtcSend('watch');
+      }
+      async function rtcSignal(m) {
+        try {
+          if (m.k === 'watch') {                // đối phương muốn xem: phát canvas + âm thanh game
+            if (net.spec || typeof RTCPeerConnection === 'undefined') return;
+            rtcStopPub();
+            const pc = rtc.pub = rtcNewPc('p'), stream = new MediaStream();
+            canvas.captureStream(60).getVideoTracks().forEach(t => pc.addTrack(t, stream));
+            const at = audio.streamTrack(); if (at) pc.addTrack(at, stream);
+            await pc.setLocalDescription(await pc.createOffer());
+            rtcSend('offer', { sdp: pc.localDescription });
+          } else if (m.k === 'offer' && rtc.view) {
+            const pc = rtc.view;
+            await pc.setRemoteDescription(m.sdp);
+            for (const c of rtc.viewQ) await pc.addIceCandidate(c);
+            rtc.viewQ = [];
+            await pc.setLocalDescription(await pc.createAnswer());
+            rtcSend('answer', { sdp: pc.localDescription });
+          } else if (m.k === 'answer' && rtc.pub) {
+            const pc = rtc.pub;
+            await pc.setRemoteDescription(m.sdp);
+            for (const c of rtc.pubQ) await pc.addIceCandidate(c);
+            rtc.pubQ = [];
+          } else if (m.k === 'ice') {           // d = 'p': ứng viên của bên phát -> thuộc pc xem của mình, và ngược lại
+            const viewSide = m.d === 'p', pc = viewSide ? rtc.view : rtc.pub;
+            if (!pc) return;
+            if (pc.remoteDescription) await pc.addIceCandidate(m.c); else (viewSide ? rtc.viewQ : rtc.pubQ).push(m.c);
+          } else if (m.k === 'stop') rtcStopPub();
+        } catch (e) { console.warn('WebRTC:', e); }
+      }
+      peerVideo.addEventListener('playing', () => { peerMsg.textContent = ''; });
+      $('btnPeerView').addEventListener('click', e => { e.currentTarget.blur(); rtcStartWatch(); });
+      $('peerClose').addEventListener('click', () => rtcStopWatch(true));
+      $('peerMute').addEventListener('click', e => { peerVideo.muted = !peerVideo.muted; e.currentTarget.textContent = peerVideo.muted ? 'Bật tiếng' : 'Tắt tiếng'; });
+
       function netConnect(first) {
         netTeardown();
         roomMsg('Đang kết nối…');
@@ -1839,6 +2026,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             roomMsg('Đã vào phòng, đang chờ người trong phòng gửi game…');
           } else if (m.t === 'peerjoined') {
             net.peer = true; net.existing = true;
+            refreshUi();
             if (nes.loaded && lastRom) { roomMsg('Có người vào phòng, đang gửi game cho họ…'); startSync(); }
             else roomMsg('Có người vào phòng. Hãy nạp ROM để cùng chơi.');
           } else if (m.t === 'peerleft') {
@@ -1851,6 +2039,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             else {
               net.existing = false; net.peer = true; net.synced = false; net.syncing = false; net.sending = false; net.catchup = false;
               net.joinAt = null; net.localIn = {}; net.remoteIn = {};
+              refreshUi();
             }
             if (m.size > 4 * 1024 * 1024) { roomMsg('ROM quá lớn.'); return; }
             net.rx = { kind: 'rom', name: String(m.name || 'ROM'), size: m.size, chunks: [], got: 0 };
@@ -1904,6 +2093,8 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             roomMsg(m.solo ? 'Bạn đã vào chơi thay.' : 'Bạn đã được vào chơi thay, đang nhận game…');
             if (m.solo && ready) { closeRoom(); showStatus(); }
             refreshUi();
+          } else if (m.t === 'rtc') {
+            rtcSignal(m);
           } else if (m.t === 'error') {
             netTeardown(); history.replaceState(null, '', BASE);
             roomMsg((m.msg || 'Lỗi') + ' Bạn có thể tạo phòng mới.'); openRoom();
