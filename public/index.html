@@ -1824,6 +1824,12 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       const JOIN_AHEAD = 45;               // số frame chừa lại để người mới bắt kịp
       let lastRom = null;
       let seated = false;                  // đã ngồi vào một máy (rời tiệm, đang ở giao diện TV)
+      // nhân vật của mình: tạo ngẫu nhiên một lần, lưu trong trình duyệt, gửi kèm khi vào phòng để người khác thấy đúng nhân vật này
+      const AVATAR = (() => {
+        let v = parseInt(lsGet('nes-avatar', ''), 10);
+        if (!Number.isInteger(v) || v < 0 || v >= 1e9) { v = Math.floor(Math.random() * 1e9); lsSet('nes-avatar', String(v)); }
+        return v;
+      })();
       const net = {
         ws: null, slot: 0, host: false, f: 0, peer: false, existing: false,
         synced: false, syncing: false, sending: false, catchup: false, joinAt: null,
@@ -2158,7 +2164,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         ws.binaryType = 'arraybuffer';
         net.ws = ws; refreshUi();
         const wantRoom = first.t === 'join' ? String(first.room || '').toUpperCase().trim() : null;
-        ws.onopen = () => netSend(first);
+        ws.onopen = () => netSend(Object.assign({ av: AVATAR }, first));
         ws.onerror = () => { if (net.ws === ws) roomMsg('Không kết nối được tới server.'); };
         ws.onclose = () => {
           if (net.ws !== ws) return;
@@ -2372,6 +2378,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         nes, loadFile, net,
         // tiệm game gọi khi người chơi ngồi vào máy: máy trống -> tạo phòng, máy có người -> vào phòng đó
         sit(room) { netConnect(room ? { t: 'join', room } : { t: 'create' }); },
+        avatar: AVATAR,
         seated: () => seated,
         isMuted: () => muted,
         toggleMute,
@@ -2476,42 +2483,101 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       }
 
       /* ---------- sprite pixel ---------- */
-      const PAL = { h: '#3a2414', s: '#f2c79b', e: '#1a1a1a', r: '#d83a2e', b: '#2f58c0', k: '#2a1a12' };
-      const PAL_NPC = { h: '#c9c9c9', s: '#f2c79b', e: '#1a1a1a', r: '#2e9e4f', b: '#4a3a2a', k: '#1a1208' };
-      const PALS = [
-        { h: '#e8c040', s: '#f2c79b', e: '#1a1a1a', r: '#3a8ae0', b: '#444455', k: '#222' },
-        { h: '#222222', s: '#d9a878', e: '#1a1a1a', r: '#3ae08a', b: '#6a3a8a', k: '#111' },
-        { h: '#8a3a1a', s: '#f2c79b', e: '#1a1a1a', r: '#b04ae0', b: '#333344', k: '#222' },
-        { h: '#ddd0a0', s: '#e8b88a', e: '#1a1a1a', r: '#ffd84a', b: '#2a4a6a', k: '#111' }
-      ];
-      const body = ['...rrrr...', '.rrrrrrrr.', '.srrrrrrs.', '..rrrrrr..', '..bbbbbb..'];
-      const SPR = {
-        D0: ['...hhhh...', '..hhhhhh..', '..hssssh..', '..hesseh..', '..hssssh..', ...body, '..bb..bb..', '..kk..kk..'],
-        D1: ['...hhhh...', '..hhhhhh..', '..hssssh..', '..hesseh..', '..hssssh..', ...body, '.bb....bb.', '.kk....kk.'],
-        U0: ['...hhhh...', '..hhhhhh..', '..hhhhhh..', '..hhhhhh..', '..hhhhhh..', ...body, '..bb..bb..', '..kk..kk..'],
-        U1: ['...hhhh...', '..hhhhhh..', '..hhhhhh..', '..hhhhhh..', '..hhhhhh..', ...body, '.bb....bb.', '.kk....kk.'],
-        S0: ['...hhhh...', '..hhhhhh..', '..hhssss..', '..hhssse..', '..hhssss..', '...rrrr...', '..rrrrrr..', '..rrrrrs..', '..rrrrrr..', '..bbbbbb..', '..bb.bb...', '..kk.kk...'],
-        S1: ['...hhhh...', '..hhhhhh..', '..hhssss..', '..hhssse..', '..hhssss..', '...rrrr...', '..rrrrrr..', '..rrrrrs..', '..rrrrrr..', '..bbbbbb..', '...bbbb...', '...kkkk...']
+      // Nhân vật 12x16 điểm ảnh, có viền đen để nổi trên nền. Bảng màu:
+      // h tóc · s da · w lòng trắng mắt · e con ngươi · m miệng · r áo · b quần · k giày · c mũ · j hoa tai · a tạp dề
+      const SKIN = { w: '#ffffff', e: '#1a1a1a', m: '#b5524a', j: '#ffd84a', a: '#f4f0e6' };
+      const look = (h, s, r, b, k, style, c) => ({ pal: Object.assign({ h, s, r, b, k, c: c || r }, SKIN), style });
+      const BA_CHU = look('#4a3a3a', '#f2c79b', '#8a3ab0', '#3a2a4a', '#1a1208', 'lady');   // bà chủ: tóc búi, áo tím, tạp dề
+      // Nhân vật của mỗi người sinh ra từ mã nhân vật (av) của họ: cùng mã -> luôn cùng nhân vật, ở mọi máy, mọi lúc.
+      // 8 màu tóc x 4 màu da x 10 màu áo x 6 màu quần x 3 kiểu tóc (x 6 màu mũ) -> rất ít khi trùng nhau.
+      const HAIR = ['#3a2414', '#111111', '#e8c040', '#8a3a1a', '#ddd0a0', '#5a3420', '#c0c0c8', '#b04a7a'];
+      const SKINS = ['#f2c79b', '#e8b88a', '#d9a878', '#c98e62'];
+      const SHIRT = ['#d83a2e', '#3a8ae0', '#3ae08a', '#b04ae0', '#ffd84a', '#ffffff', '#e0603a', '#2a9a9a', '#ff7ab0', '#7a5a3a'];
+      const PANTS = ['#2f58c0', '#444455', '#6a3a8a', '#2a4a6a', '#2a2a3a', '#5a4030'];
+      const CAPS = ['#e0603a', '#3a8ae0', '#3ae08a', '#ffd84a', '#ffffff', '#222222'];
+      const STYLES = ['short', 'long', 'cap'];
+      const lookCache = new Map();
+      function lookOf(av) {
+        av = (av >>> 0) || 1;
+        if (lookCache.has(av)) return lookCache.get(av);
+        let x = av;
+        const pick = a => { x = (Math.imul(x ^ (x >>> 15), 2246822519) + 0x9e3779b9) >>> 0; return a[x % a.length]; };
+        const lk = look(pick(HAIR), pick(SKINS), pick(SHIRT), pick(PANTS), '#1a1208', pick(STYLES), pick(CAPS));
+        lookCache.set(av, lk); return lk;
+      }
+      const ME = lookOf(app.avatar);           // nhân vật của mình: đúng nhân vật người khác thấy khi mình ngồi chơi
+      const LEGS = { D0: ['..bbb..bbb..', '..bbb..bbb..', '.kkkk..kkkk.'], D1: ['...bb..bbb..', '...bb..bbb..', '...kk.kkkk..'] };
+      const FRONT_BODY = ['..rrrrrrrr..', '.rrrrrrrrrr.', 'srrrrrrrrrrs', 's.rrrrrrrr.s', '..bbbbbbbb..'];
+      const FRONT_HEAD = ['...hhhhhh...', '..hhhhhhhh..', '.hhhhhhhhhh.', '.hssssssssh.', '.hswesswesh.', '.hssssssssh.', '..sssmmsss..', '...ssssss...'];
+      const BACK_HEAD = ['...hhhhhh...', '..hhhhhhhh..', '.hhhhhhhhhh.', '.hhhhhhhhhh.', '.hhhhhhhhhh.', '.hhhhhhhhhh.', '..hhhhhhhh..', '...ssssss...'];
+      const SIDE = ['...hhhhhh...', '..hhhhhhhh..', '.hhhhhhhhhh.', '.hhhhsssss..', '.hhhssswes..', '.hhhssssss..', '..hhsssssm..', '....ssss....',
+        '...rrrrrr...', '..rrrrrrrr..', '..rrrrrrrs..', '..rrrrrrrr..', '..bbbbbbbb..'];
+      const BASE = {
+        D0: [...FRONT_HEAD, ...FRONT_BODY, ...LEGS.D0], D1: [...FRONT_HEAD, ...FRONT_BODY, ...LEGS.D1],
+        U0: [...BACK_HEAD, ...FRONT_BODY, ...LEGS.D0], U1: [...BACK_HEAD, ...FRONT_BODY, ...LEGS.D1],
+        S0: [...SIDE, '..bbb.bbb...', '..bbb.bbb...', '.kkkk.kkkk..'], S1: [...SIDE, '...bbbbb....', '...bbbbb....', '...kkkkkk...'],
+        SIT: [...BACK_HEAD, ...FRONT_BODY.slice(0, 4), '.bbbbbbbbbb.']   // ngồi trên ghế, quay lưng ra ngoài
       };
+      const sprCache = new Map();
+      function sprite(key, style) {          // ghép kiểu tóc / mũ / trang phục vào hình gốc
+        const ck = key + ':' + style; if (sprCache.has(ck)) return sprCache.get(ck);
+        const dir = key === 'SIT' ? 'U' : key[0];
+        const rows = BASE[key].map(r => r.split(''));
+        const set = (j, row) => { rows[j] = row.split(''); };
+        if (style === 'cap') {
+          set(0, '...cccccc...'); set(1, '..cccccccc..');
+          set(2, dir === 'S' ? '.ccccccccccc' : dir === 'U' ? '.cccccccccc.' : 'cccccccccccc');   // vành mũ
+        }
+        if (style === 'long' || style === 'lady') {
+          for (let j = 3; j <= 9; j++) {
+            if (dir === 'S') { for (let i = 1; i <= 3; i++) rows[j][i] = 'h'; }
+            else { rows[j][0] = 'h'; rows[j][11] = 'h'; if (j <= 7) { rows[j][1] = 'h'; rows[j][10] = 'h'; } }
+          }
+        }
+        if (style === 'lady') {
+          if (dir === 'D') {
+            rows[6][1] = 'j'; rows[6][10] = 'j';                                   // hoa tai
+            rows[8][4] = 'a'; rows[8][7] = 'a';                                    // dây tạp dề
+            for (let j = 9; j <= 13; j++) for (let i = 3; i <= 8; i++) rows[j][i] = 'a';
+          }
+          rows.unshift((dir === 'S' ? '..hhhh......' : '....hhhh....').split(''));   // búi tóc
+        }
+        const out = rows.map(r => r.join(''));
+        sprCache.set(ck, out); return out;
+      }
+      const OUTLINE = '#0b0b14';
       function spr(rows, pal, x, y, ps, flip) {
         const w = rows[0].length, h = rows.length, x0 = x - w * ps / 2, y0 = y - h * ps;
-        for (let j = 0; j < h; j++) {
-          const row = rows[j];
-          for (let i = 0; i < w; i++) {
-            const c = row[flip ? w - 1 - i : i]; if (c === '.') continue;
-            ctx.fillStyle = pal[c];
-            const a = Math.round(x0 + i * ps), b = Math.round(y0 + j * ps), a2 = Math.round(x0 + (i + 1) * ps), b2 = Math.round(y0 + (j + 1) * ps);
-            ctx.fillRect(a, b, a2 - a, b2 - b);
+        const o = Math.max(1, ps * .22);
+        for (let pass = 0; pass < 2; pass++) {   // lượt 1: viền đen, lượt 2: màu
+          for (let j = 0; j < h; j++) {
+            const row = rows[j];
+            for (let i = 0; i < w; i++) {
+              const c = row[flip ? w - 1 - i : i]; if (c === '.') continue;
+              const a = Math.round(x0 + i * ps), b = Math.round(y0 + j * ps), a2 = Math.round(x0 + (i + 1) * ps), b2 = Math.round(y0 + (j + 1) * ps);
+              if (pass === 0) { ctx.fillStyle = OUTLINE; ctx.fillRect(a - o, b - o, a2 - a + 2 * o, b2 - b + 2 * o); }
+              else { ctx.fillStyle = pal[c] || '#f0f'; ctx.fillRect(a, b, a2 - a, b2 - b); }
+            }
           }
         }
       }
-      function drawActor(x, z, pal, dir, moving, walk, lift) {
+      const PS = .12;                         // cỡ 1 điểm ảnh nhân vật (đơn vị thế giới)
+      function drawActor(x, z, lk, dir, moving, walk, lift) {
         const q0 = proj(x, 0, z), q = proj(x, lift || 0, z), sx = q[0], sy = q[1], s = q[2];
-        ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(q0[0], q0[1], .42 * s, .17 * s, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(q0[0], q0[1], .46 * s, .18 * s, 0, 0, 7); ctx.fill();
         const f = moving ? (Math.floor(walk * 2) % 2) : 0, bob = moving ? Math.abs(Math.sin(walk * Math.PI * 2)) * .06 * s : 0;
-        let rows, flip = false;
-        if (dir === 'D') rows = SPR['D' + f]; else if (dir === 'U') rows = SPR['U' + f]; else { rows = SPR['S' + f]; flip = dir === 'L'; }
-        spr(rows, pal, sx, sy - bob, s * .14, flip);
+        let key, flip = false;
+        if (dir === 'SIT') key = 'SIT'; else if (dir === 'D') key = 'D' + f; else if (dir === 'U') key = 'U' + f; else { key = 'S' + f; flip = dir === 'L'; }
+        spr(sprite(key, lk.style), lk.pal, sx, sy - bob, s * PS, flip);
+      }
+      // nhãn nhỏ trên đầu nhân vật (BẠN, P1, P2, BÀ CHỦ)
+      function tag(t, x, z, lift, rows, col) {
+        const q = proj(x, (lift || 0) + rows * PS + .3, z);
+        ctx.font = '16px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+        const w = Math.round(ctx.measureText(t).width + 8), x0 = Math.round(q[0] - w / 2), y0 = Math.round(q[1] - 19);
+        ctx.fillStyle = 'rgba(10,10,30,.85)'; ctx.fillRect(x0, y0, w, 21);     // khung cao đủ chứa dấu trên (À, Ủ) và dấu nặng (Ạ)
+        ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.strokeRect(x0 + .5, y0 + .5, w - 1, 20);
+        ctx.fillStyle = col; ctx.fillText(t, q[0], y0 + 15);
       }
 
       /* ---------- trạng thái ---------- */
@@ -2595,7 +2661,11 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         [-hw + 1.5, hw - 6.5].forEach(x => addBox({ x, z: -7, w: 5, d: .7, h: 2.8, c: C('#6b4a2e') }));
         addBox({ x: -2.5, z: -5.6, w: 5, d: 1.2, h: 1.1, c: C('#8a5a2b') });
         w.objs.push({ z: -4.3, f: () => dbox({ x: 1.2, z: -5.3, w: .9, d: .6, h: .4, y: 1.1, c: C('#3a3a44') }) });
-        w.objs.push({ z: -6.4, f: () => drawActor(0, -6.4, PAL_NPC, 'D', false, 0) });
+        // bà chủ đứng trên bục sau quầy (để thấy rõ nửa người trên quầy), thỉnh thoảng nhìn sang hai bên
+        w.objs.push({ z: -6.4, f: () => {
+          const ph = Math.floor(S.t / 2.5) % 4, dir = ph === 1 ? 'R' : ph === 3 ? 'L' : 'D';
+          drawActor(0, -6.4, BA_CHU, dir, false, 0, .45);
+        } });
         [[-hw + .6, '#5a2a8a'], [hw - 2.1, '#1a6a8a']].forEach(a => {
           addBox({ x: a[0], z: -4.6, w: 1.5, d: 1.3, h: 3.2, c: C(a[1]) });
           w.objs.push({ z: -3.29, f: () => {
@@ -2641,11 +2711,13 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             if (col) cartOn(sx + .8, -1.5, .9, col);
           } });
           if (occ) {
-            const p = PALS[hash(r.room) % PALS.length], p2 = PALS[(hash(r.room) + 1) % PALS.length];
-            w.objs.push({ z: .85, f: () => drawActor(sx - .7, .35, p, 'U', false, 0, .55 + Math.abs(Math.sin(S.t * 7 + i)) * .03) });
-            if (full) w.objs.push({ z: .86, f: () => drawActor(sx + .7, .35, p2, 'U', false, 0, .55 + Math.abs(Math.sin(S.t * 6 + i)) * .03) });
+            // người chơi ngồi đúng ghế của mình (P1 bên trái, P2 bên phải), bằng nhân vật của chính họ; nhún nhẹ như đang bấm tay cầm
+            for (const seat of r.seats) {
+              const lk = lookOf(seat.av), px = seat.slot === 1 ? sx + .7 : sx - .7, ph = seat.slot * 1.3 + i;
+              w.objs.push({ z: .85 + seat.slot * .01, f: () => drawActor(px, .35, lk, 'SIT', false, 0, .55 + Math.abs(Math.sin(S.t * 7 + ph)) * .03) });
+            }
             for (let k = 0; k < Math.min(3, r.specs); k++) {   // khách đứng xem phía sau
-              const pk = PALS[(hash(r.room) + 2 + k) % PALS.length], zx = sx - .9 + k * .9;
+              const pk = lookOf(r.specAv[k] !== undefined ? r.specAv[k] : hash(r.room) + k), zx = sx - .9 + k * .9;
               w.objs.push({ z: 1.95, f: () => drawActor(zx, 1.85, pk, 'U', false, 0) });
               w.solids.push({ x: zx - .3, z: 1.6, w: .6, d: .5 });
             }
@@ -2655,8 +2727,14 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
               : 'Ngồi chơi cùng ở máy ' + num + (game ? ' · ' + short(game, 18) : '');
           w.inter.push({ x: sx, z: .4, r: 1.9, ay: 1.8, label, st: { r, num, sx, game }, fn: () => sit(r, num, i) });
         });
-        w.inter.push({ x: 0, z: -5, r: 2.3, ay: 2.6, label: 'Nói chuyện với chủ tiệm', fn: talk });
+        w.inter.push({ x: 0, z: -5, r: 2.3, ay: 3.4, label: 'Nói chuyện với bà chủ', fn: talk });
         w.top = () => {
+          tag('BÀ CHỦ', -1.6, -6.4, .45, 11, '#ff9ae6');   // đặt bên cạnh, không đè biển đèn
+          st.forEach((r, i) => {                 // P1 / P2 trên đầu người đang ngồi chơi
+            if (!r) return;
+            const sx = (i - (n - 1) / 2) * SP;
+            for (const seat of r.seats) tag('P' + (seat.slot + 1), seat.slot === 1 ? sx + .7 : sx - .7, .35, .55, 13, '#8affa0');
+          });
           st.forEach((r, i) => {
             const sx = (i - (n - 1) / 2) * SP;
             lbl('MÁY ' + (i + 1), sx - .75, 3.55, -1.5, '#fff');
@@ -2696,7 +2774,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       /* ---------- vào máy ---------- */
       function sit(r, num, idx) {
         if (S.busy) return;
-        if (r && !rooms.some(x => x.room === r.room)) { sfx.no(); say([{ n: 'Chủ tiệm', t: 'Máy này vừa có người đứng dậy rồi, cháu chọn máy khác nhé.' }]); return; }
+        if (r && !rooms.some(x => x.room === r.room)) { sfx.no(); say([{ n: 'Bà chủ', t: 'Máy này vừa có người đứng dậy rồi, cháu chọn máy khác nhé.' }]); return; }
         S.busy = true; sfx.pick(); setObj('');
         ss.set('shop-seat', String(idx)); saveSeats();     // nhớ máy đã ngồi để lúc đứng dậy quay về đúng chỗ
         const text = !r ? 'MÁY ' + num : r.players >= 2 ? 'ĐỨNG XEM MÁY ' + num : 'NGỒI CÙNG MÁY ' + num;
@@ -2704,9 +2782,9 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       }
       function talk() {
         const free = WD.st.filter(r => !r).length, half = rooms.filter(r => r.players === 1);
-        const lines = [{ n: 'Chủ tiệm', t: rooms.length ? 'Đang có ' + rooms.length + ' máy chạy. Máy sáng màn hình là có người chơi, máy tối là còn trống.' : 'Hôm nay tiệm vắng quá! Máy nào cũng trống, cháu chọn đại một máy mà ngồi.' }];
-        if (half.length) lines.push({ n: 'Chủ tiệm', t: 'Máy ghi "CÒN 1 GHẾ" thì ngồi vào chơi cùng được. Máy đủ 2 người thì đứng sau xem.' });
-        lines.push({ n: 'Chủ tiệm', t: 'Ngồi vào máy trống là được chọn băng game. Muốn rủ bạn thì gửi link mời ở màn hình chọn băng. Còn ' + free + ' máy trống.' });
+        const lines = [{ n: 'Bà chủ', t: rooms.length ? 'Đang có ' + rooms.length + ' máy chạy. Máy sáng màn hình là có người chơi, máy tối là còn trống.' : 'Hôm nay tiệm vắng quá! Máy nào cũng trống, cháu chọn đại một máy mà ngồi.' }];
+        if (half.length) lines.push({ n: 'Bà chủ', t: 'Máy ghi "CÒN 1 GHẾ" thì ngồi vào chơi cùng được. Máy đủ 2 người thì đứng sau xem.' });
+        lines.push({ n: 'Bà chủ', t: 'Ngồi vào máy trống là được chọn băng game. Muốn rủ bạn thì gửi link mời ở màn hình chọn băng. Còn ' + free + ' máy trống.' });
         say(lines);
       }
       // bị từ chối vào phòng (phòng vừa đóng): quay lại tiệm
@@ -2722,7 +2800,11 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
           let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
           if (m.t !== 'rooms' || !Array.isArray(m.list)) return;
           const before = rooms.length;
-          rooms = m.list.filter(r => r && typeof r.room === 'string').map(r => ({ room: r.room, players: r.players | 0, specs: r.specs | 0, game: String(r.game || '') }));
+          rooms = m.list.filter(r => r && typeof r.room === 'string').map(r => ({
+            room: r.room, players: r.players | 0, specs: r.specs | 0, game: String(r.game || ''),
+            seats: (Array.isArray(r.seats) ? r.seats : []).filter(s => s && (s.slot === 0 || s.slot === 1)).map(s => ({ slot: s.slot, av: s.av >>> 0 })),
+            specAv: (Array.isArray(r.specAv) ? r.specAv : []).map(v => v >>> 0)
+          }));
           if (S.scene === 'shop' && rooms.length > before) sfx.ding();
           rebuild(true);
         };
@@ -2814,10 +2896,11 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         ctx.fillStyle = '#0a0a14'; ctx.fillRect(0, 0, W, H);
         WD.back();
         const list = WD.objs.slice();
-        list.push({ z: player.z, f: () => drawActor(player.x, player.z, PAL, player.dir, player.moving, player.walk) });
+        list.push({ z: player.z, f: () => drawActor(player.x, player.z, ME, player.dir, player.moving, player.walk) });
         list.sort((a, b) => a.z - b.z);
         for (const o of list) o.f();
         WD.top();
+        if (S.scene !== 'title') tag('BẠN', player.x, player.z, 0, 16, '#ffd84a');
         if (cur) arrow(cur.x, cur.ay, cur.z, S.t);
         renderFade();
       }
@@ -2827,9 +2910,9 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         audio(); $('shTitle').style.display = 'none';
         S.scene = 'shop'; setObj('Chọn một máy để ngồi chơi');
         if (quiet) return;
-        say([{ n: 'Chủ tiệm', t: 'Chào mừng đến Tiệm Game 1990! Mỗi máy Famicom ở đây là một phòng chơi.' },
-          { n: 'Chủ tiệm', t: 'Máy tối màn hình là còn trống. Máy sáng là có người đang chơi, lại gần để ngồi chơi cùng hoặc đứng xem.' },
-          { n: 'Chủ tiệm', t: 'Lại gần ghế rồi bấm E để ngồi nhé!' }]);
+        say([{ n: 'Bà chủ', t: 'Chào mừng đến Tiệm Game 1990! Mỗi máy Famicom ở đây là một phòng chơi.' },
+          { n: 'Bà chủ', t: 'Máy tối màn hình là còn trống. Máy sáng là có người đang chơi, lại gần để ngồi chơi cùng hoặc đứng xem.' },
+          { n: 'Bà chủ', t: 'Lại gần ghế rồi bấm E để ngồi nhé!' }]);
       }
       function press(k) {
         audio();

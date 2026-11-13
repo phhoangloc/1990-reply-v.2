@@ -67,9 +67,16 @@ const MAX_SPECS = 20;
 // Tiệm game (trang chủ): các kết nối đang xem danh sách phòng, nhận cập nhật mỗi khi phòng thay đổi
 const lobby = new Set();
 let lobbyTimer = null;
+// Nhân vật của mỗi người (số do trình duyệt tạo một lần và lưu lại): ai nhìn vào cũng thấy người đó cùng một nhân vật
+const AV_MAX = 1e9;
+const avatarOf = v => (Number.isInteger(v) && v >= 0 && v < AV_MAX ? v : Math.floor(Math.random() * AV_MAX));
 function roomList() {
   return [...rooms].sort((a, b) => a[1].at - b[1].at)
-    .map(([room, r]) => ({ room, players: r.players.length, specs: r.specs.length, game: r.game || '' }));
+    .map(([room, r]) => ({
+      room, players: r.players.length, specs: r.specs.length, game: r.game || '',
+      seats: r.players.map(p => ({ slot: p.slot, av: p.av })).sort((a, b) => a.slot - b.slot),   // ai ngồi ghế nào
+      specAv: r.specs.slice(0, 3).map(s => s.av)                                                // vài khách xem đứng sau
+    }));
 }
 function pushLobby() {                                          // gom nhiều thay đổi liền nhau thành một lần gửi
   if (lobbyTimer) return;
@@ -158,7 +165,7 @@ const beat = setInterval(() => {
 wss.on('close', () => clearInterval(beat));
 wss.on('connection', ws => {
   ws.alive = true; ws.on('pong', () => { ws.alive = true; });
-  ws.room = null; ws.slot = 0; ws.id = nextId++; ws.spec = false; ws.fed = false; ws.feeding = false; ws.feedTo = null;
+  ws.room = null; ws.slot = 0; ws.id = nextId++; ws.av = avatarOf(); ws.spec = false; ws.fed = false; ws.feeding = false; ws.feedTo = null;
   ws.on('message', (raw, isBinary) => {
     if (isBinary) {
       if (ws.spec) return;
@@ -173,6 +180,7 @@ wss.on('connection', ws => {
       lobby.add(ws);
       return send(ws, { t: 'rooms', list: roomList() });
     }
+    if (m.t === 'create' || m.t === 'join') ws.av = avatarOf(m.av);
     if (m.t === 'create') {
       leave(ws);
       const code = newCode();
