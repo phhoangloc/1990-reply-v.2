@@ -36,17 +36,6 @@ const TYPES = {
   '.zip': 'application/zip'
 };
 
-// Băng game: các file .nes / .zip nằm trong public/ và public/roms/
-function listGames() {
-  const out = [];
-  for (const dir of ['', 'roms']) {
-    let names = [];
-    try { names = fs.readdirSync(path.join(ROOT, dir)); } catch { continue; }
-    for (const n of names) if (/\.(nes|zip)$/i.test(n)) out.push({ name: n.replace(/\.(nes|zip)$/i, ''), path: (dir ? dir + '/' : '') + n });
-  }
-  return out.sort((a, b) => a.name.localeCompare(b.name));
-}
-
 const server = http.createServer((req, res) => {
   let pathname;
   try { pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname); }
@@ -54,10 +43,6 @@ const server = http.createServer((req, res) => {
   if (pathname === BASE.slice(0, -1) && BASE !== '/') { res.writeHead(302, { Location: BASE }); return res.end(); }
   if (!pathname.startsWith(BASE)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Not found'); }
   pathname = pathname.slice(BASE.length - 1);                   // bỏ tiền tố, giữ dấu / đầu
-  if (pathname === '/api/games') {                              // danh sách băng game có sẵn trên server
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-    return res.end(JSON.stringify(listGames()));
-  }
   if (pathname.endsWith('/') || !path.extname(pathname)) pathname = '/index.html'; // /:id trả về trang chính
   const file = path.join(ROOT, pathname);
   if (file !== ROOT && !file.startsWith(ROOT + path.sep)) { res.writeHead(403); return res.end('Forbidden'); }

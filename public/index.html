@@ -307,16 +307,21 @@
     .tv-sub { color: #9fffc8; font-size: clamp(16px, 2.4vw, 22px) }
     .blink { animation: blink 1s steps(2) infinite }
     @keyframes blink { 50% { opacity: 0 } }
-    .games { display: flex; flex-direction: column; gap: 6px; width: min(520px, 100%); max-height: 34vh; max-height: 34dvh; overflow-y: auto; padding: 2px 4px }
-    .games button.game {
-      display: flex; align-items: center; gap: 12px; text-align: left; width: 100%;
-      font: inherit; font-size: clamp(18px, 2.6vw, 24px); color: #fff; background: rgba(16, 16, 58, .85);
-      border: 2px solid #fff4; border-radius: 4px; padding: 4px 12px
+    /* nút cắm băng */
+    .cartbtn {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      width: min(360px, 80%); padding: 14px 18px 12px; background: rgba(16, 16, 58, .85); border: 2px dashed #fff8; border-radius: 6px; box-shadow: none
     }
-    .games button.game::before { content: ""; flex: none; width: 18px; height: 24px; background: var(--c, #e0603a); border: 2px solid #000; box-shadow: inset 0 -8px 0 #0005 }
-    .games button.game:hover, .games button.game:focus { background: var(--navy); border-color: var(--gold); outline: none }
-    .games button.game:focus::after { content: "◀"; margin-left: auto; color: var(--gold) }
-    .games .none { color: #9aa0d0; font-size: 18px }
+    .cartbtn:hover, .cartbtn:focus { background: var(--navy); border: 2px solid var(--gold); outline: none }
+    .cartbtn svg { width: min(220px, 60%); height: auto; display: block }
+    .cartbtn .cart { animation: insert 1.6s steps(8) infinite }
+    .cartbtn:hover .cart, .cartbtn:focus .cart { animation-duration: .8s }
+    .cartbtn .arrow { animation: blink .8s steps(2) infinite }
+    .cartbtn .led { animation: blink 1.6s steps(2) infinite }
+    @keyframes insert { 0%, 15% { transform: translateY(0) } 70%, 100% { transform: translateY(12px) } }
+    .cartbtn .cb-t { font-size: clamp(24px, 3.6vw, 34px); color: var(--gold); text-shadow: 2px 2px 0 #000; letter-spacing: .06em }
+    .cartbtn .cb-s { font-size: clamp(15px, 2vw, 19px); color: #9aa0d0 }
+    .stage.drag .cartbtn .cart { animation-duration: .5s }
     .pickrow, .linkrow { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; width: min(520px, 100%) }
     .linkrow input { flex: 1; min-width: 0; font: 18px var(--px) !important; background: #000 !important; border: 2px solid #fff4 !important; border-radius: 4px !important }
     .overlay .sub { color: #9aa0d0; font-size: 18px }
@@ -404,9 +409,36 @@
         <div id="picker" style="display:none">
           <div class="tv-title">CHỌN BĂNG GAME</div>
           <div class="tv-sub" id="pickerSub">Chọn một băng để cắm vào máy</div>
-          <div class="games" id="gameList"><div class="none">Đang tìm băng…</div></div>
+          <!-- nút cắm băng: hình băng game đang cắm xuống máy Famicom; bấm để chọn file ROM trên máy -->
+          <button type="button" class="cartbtn" id="lobbyRom" aria-label="Cắm băng: chọn file ROM .nes hoặc .zip">
+            <svg viewBox="0 0 64 50" shape-rendering="crispEdges" aria-hidden="true">
+              <g class="cart">
+                <rect x="21" y="1" width="22" height="22" fill="#000" />
+                <rect x="22" y="2" width="20" height="20" fill="#e0603a" />
+                <rect x="22" y="2" width="20" height="2" fill="#f8a070" />
+                <rect x="25" y="6" width="14" height="9" fill="#fff" opacity=".85" />
+                <rect x="27" y="8" width="10" height="2" fill="#3a8ae0" />
+                <rect x="27" y="11" width="6" height="2" fill="#e0603a" />
+                <rect x="24" y="17" width="16" height="1" fill="#0005" />
+                <rect x="24" y="19" width="16" height="1" fill="#0005" />
+              </g>
+              <g class="arrow"><rect x="56" y="6" width="5" height="2" fill="#ffd84a" /><rect x="57" y="8" width="3" height="2" fill="#ffd84a" /><rect x="58" y="10" width="1" height="2" fill="#ffd84a" /></g>
+              <rect x="5" y="27" width="54" height="20" fill="#000" />
+              <rect x="6" y="28" width="52" height="18" fill="#ddd3bb" />
+              <rect x="6" y="28" width="52" height="4" fill="#f6eedb" />
+              <rect x="19" y="28" width="26" height="4" fill="#222" />
+              <rect x="6" y="39" width="52" height="7" fill="#962027" />
+              <rect x="6" y="39" width="52" height="1" fill="#c4343a" />
+              <rect x="10" y="34" width="6" height="3" fill="#b9af97" />
+              <rect x="48" y="34" width="6" height="3" fill="#b9af97" />
+              <rect x="12" y="41" width="4" height="3" fill="#741a1f" />
+              <rect x="48" y="41" width="4" height="3" fill="#741a1f" />
+              <rect x="30" y="42" width="2" height="2" fill="#3f3" class="led" />
+            </svg>
+            <span class="cb-t">CẮM BĂNG</span>
+            <span class="cb-s">Chọn file ROM .nes / .zip trên máy · hoặc kéo thả vào đây</span>
+          </button>
           <div class="pickrow">
-            <button type="button" id="lobbyRom">📂 Băng của bạn (.nes / .zip)</button>
             <button type="button" id="pickerClose" style="display:none">▶ Chơi tiếp</button>
           </div>
           <div class="linkrow">
@@ -1728,39 +1760,13 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
           statusEl.textContent = 'Nạp ROM thất bại';
         }
       }
-      // ---- màn hình chọn băng game ----
-      let pickerOpen = false, games = null;
-      const CART_COLORS = ['#e0603a', '#3a8ae0', '#ffd84a', '#3ae08a', '#b04ae0', '#dddddd'];
-      function renderGames() {
-        const box = $('gameList'); box.textContent = '';
-        if (!games) { box.innerHTML = '<div class="none">Đang tìm băng…</div>'; return; }
-        if (!games.length) { box.innerHTML = '<div class="none">Tiệm chưa có băng nào (bỏ file .nes vào thư mục public/roms). Hãy dùng băng của bạn.</div>'; return; }
-        const focusFirst = pickerOpen && !document.querySelector('#picker button:focus');
-        games.forEach((g, i) => {
-          const b = document.createElement('button');
-          b.type = 'button'; b.className = 'game'; b.textContent = g.name;
-          b.style.setProperty('--c', CART_COLORS[i % CART_COLORS.length]);
-          b.addEventListener('click', () => {
-            b.blur();
-            statusEl.textContent = 'Đang cắm băng ' + g.name + '…';
-            loadBytes(() => fetch(BASE + g.path.split('/').map(encodeURIComponent).join('/')).then(r => {
-              if (!r.ok) throw new Error('Không tải được băng (' + r.status + ')');
-              return r.arrayBuffer();
-            }), g.name);
-          });
-          box.appendChild(b);
-        });
-        if (focusFirst && box.firstElementChild) box.firstElementChild.focus();   // chọn sẵn băng đầu: bấm Enter là chơi
-      }
-      function fetchGames() {
-        fetch(BASE + 'api/games', { cache: 'no-store' }).then(r => r.json()).then(l => { games = Array.isArray(l) ? l : []; renderGames(); })
-          .catch(() => { games = []; renderGames(); });
-      }
+      // ---- màn hình chọn băng game: chỉ có nút cắm băng (người chơi tự chọn file ROM, không có ROM sẵn) ----
+      let pickerOpen = false;
+      const focusCart = () => setTimeout(() => { if (pickerOpen) $('lobbyRom').focus(); }, 30);   // Enter / Space là mở chọn file
       function showPicker() {
         if (!net.ws || net.spec || net.synced || net.syncing) return;
         pickerOpen = true; errEl.textContent = ''; overlay.classList.remove('hidden');
-        fetchGames(); refreshUi();
-        setTimeout(() => { const b = document.querySelector('#gameList button'); if (b) b.focus(); }, 30);
+        refreshUi(); focusCart();
       }
       function hidePicker() {
         pickerOpen = false;
@@ -2025,7 +2031,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         const canPick = inRoom && !net.spec && !net.synced && !net.syncing;
         if (pickerOpen && !canPick) { pickerOpen = false; if (nes.loaded) overlay.classList.add('hidden'); }
         // vừa ngồi vào máy (chủ máy, chưa có băng) -> mở luôn màn hình chọn băng
-        if (canPick && net.host && !nes.loaded && !pickerOpen) { pickerOpen = true; fetchGames(); }
+        if (canPick && net.host && !nes.loaded && !pickerOpen) { pickerOpen = true; focusCart(); }
         const pick = pickerOpen && canPick;
         $('picker').style.display = pick ? '' : 'none';
         $('pickerClose').style.display = nes.loaded ? '' : 'none';
@@ -2291,7 +2297,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         if (!nes.loaded || net.spec || net.syncing || net.catchup) return;
         netSend({ t: 'eject' });
         unloadGame();
-        pickerOpen = !!net.ws; if (pickerOpen) fetchGames();
+        pickerOpen = !!net.ws; if (pickerOpen) focusCart();
         refreshUi();
         roomMsg(net.peer ? 'Đã rút băng. Chọn băng mới, người chơi cùng sẽ chơi theo.' : 'Đã rút băng. Chọn băng khác để chơi.');
       }
