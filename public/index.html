@@ -8,6 +8,9 @@
   <meta name="ws-path" content="/ws">
   <meta name="base-route" content="/">
   <meta name="ice-servers" content='[{"urls":"stun:stun.l.google.com:19302"}]'>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #0e1015;
@@ -274,37 +277,154 @@
     .toast.on { opacity: 1; transform: none }
     .toast.join { border-color: var(--accent); }
     #roomLink { flex: 1; min-width: 0; background: var(--panel2); border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 6px 10px; font: 14px ui-monospace, Consolas, monospace }
+
+    /* ===== giao diện tiệm game 8-bit: phòng chơi là một chiếc TV ===== */
+    :root { --px: 'VT323', ui-monospace, monospace; --navy: #10103a; --gold: #ffd84a; --red: #ff5a4e }
+    html, body { background: #07070d; font-family: var(--px); font-size: 20px; line-height: 1.15 }
+    body { background: radial-gradient(ellipse at 50% 40%, #1a1440 0%, #07070d 70%) fixed }
+    .app { padding: 22px 70px 10px 22px; gap: 0; align-items: center }
+    .stage {
+      border-radius: 16px; overflow: hidden;
+      width: min(100%, max(160px, calc((100vh - 96px)*4/3)));
+      width: min(100%, max(160px, calc((100dvh - 96px)*4/3)));
+      box-shadow: 0 0 0 12px #2a2a32, 0 0 0 18px #7a7a86, 0 0 0 20px #000, 0 0 60px 20px rgba(120, 80, 255, .22)
+    }
+    .stage::before {                      /* đường quét + tối viền như TV CRT */
+      content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+      background: repeating-linear-gradient(rgba(0, 0, 0, .16) 0 1px, transparent 1px 3px),
+        radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, .45) 100%)
+    }
+    .stage:fullscreen { box-shadow: none }
+    .overlay { z-index: 2; background: #0c1612; font-family: var(--px); gap: 10px; padding: 4% 6% }
+    .tvbar { margin-top: 26px; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: min(100%, max(160px, calc((100vh - 96px)*4/3))); width: min(100%, max(160px, calc((100dvh - 96px)*4/3))) }
+    .tvbar button { font-size: 18px; padding: 2px 12px; white-space: nowrap }
+    #btnLeave { background: #5a1a1a }
+    #btnLeave:hover { background: var(--red) }
+    .tvbrand { display: flex; align-items: center; gap: 10px; color: #8a8a9a; font-size: 18px; letter-spacing: .08em; flex: none }
+    .tvbrand i { width: 9px; height: 9px; background: #a33; display: inline-block }
+    .tvbrand i.on { background: #3f3; box-shadow: 0 0 8px #3f3 }
+    .tv-title { font-size: clamp(26px, 5vw, 44px); color: var(--gold); text-shadow: 3px 3px 0 #000; letter-spacing: .05em }
+    .tv-sub { color: #9fffc8; font-size: clamp(16px, 2.4vw, 22px) }
+    .blink { animation: blink 1s steps(2) infinite }
+    @keyframes blink { 50% { opacity: 0 } }
+    .games { display: flex; flex-direction: column; gap: 6px; width: min(520px, 100%); max-height: 34vh; max-height: 34dvh; overflow-y: auto; padding: 2px 4px }
+    .games button.game {
+      display: flex; align-items: center; gap: 12px; text-align: left; width: 100%;
+      font: inherit; font-size: clamp(18px, 2.6vw, 24px); color: #fff; background: rgba(16, 16, 58, .85);
+      border: 2px solid #fff4; border-radius: 4px; padding: 4px 12px
+    }
+    .games button.game::before { content: ""; flex: none; width: 18px; height: 24px; background: var(--c, #e0603a); border: 2px solid #000; box-shadow: inset 0 -8px 0 #0005 }
+    .games button.game:hover, .games button.game:focus { background: var(--navy); border-color: var(--gold); outline: none }
+    .games button.game:focus::after { content: "◀"; margin-left: auto; color: var(--gold) }
+    .games .none { color: #9aa0d0; font-size: 18px }
+    .pickrow, .linkrow { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; width: min(520px, 100%) }
+    .linkrow input { flex: 1; min-width: 0; font: 18px var(--px) !important; background: #000 !important; border: 2px solid #fff4 !important; border-radius: 4px !important }
+    .overlay .sub { color: #9aa0d0; font-size: 18px }
+    .overlay .err { font-size: 18px }
+
+    button, .btn { font-family: var(--px); font-size: 20px; background: var(--navy); border: 2px solid #fff; border-radius: 4px; box-shadow: 3px 3px 0 #000; padding: 4px 14px }
+    button:hover, .btn:hover { background: #1c1c5a; border-color: #fff }
+    button:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000 }
+    .primary, .primary:hover { background: var(--red); border-color: #fff }
+    button.ic { width: 42px; height: 42px; font-size: 20px }
+    .toolbar { top: 14px; right: 12px }
+    #status { top: 46px; bottom: auto; max-width: max(150px, calc((100vw - min(100vw, calc((100dvh - 96px)*4/3))) / 2 - 24px)); white-space: normal; font-family: var(--px); font-size: 17px; color: #9aa0d0; background: rgba(10, 10, 30, .8); border: 1px solid #fff4; border-radius: 4px }
+    .toast { font-size: 20px; background: var(--navy); border: 2px solid #fff; border-radius: 4px; box-shadow: 3px 3px 0 #000 }
+    .toast.join { border-color: var(--gold) }
+    .modal .box { background: var(--navy); border: 2px solid #fff; border-radius: 4px; box-shadow: 4px 4px 0 #000 }
+    .modal h2 { font-weight: 400; font-size: 28px; color: var(--gold) }
+    .modal p.hint { font-size: 17px; color: #9aa0d0 }
+    .modal td button.bind { font: 18px var(--px) }
+    .roster .badge, .roster .eye { font-family: var(--px); font-size: 18px; font-weight: 400; border-radius: 4px }
+
+    /* ===== tiệm game (trang chủ) ===== */
+    #shop { position: fixed; inset: 0; z-index: 80; background: #07070d; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; --padh: 0px }
+    body.inroom #shop { display: none }
+    body:not(.inroom) .app { visibility: hidden }
+    .toasts { z-index: 90 }
+    #shopStage { position: relative; width: min(100vw, calc((100vh - var(--padh)) * 1.6)); width: min(100vw, calc((100dvh - var(--padh)) * 1.6)); aspect-ratio: 8/5; background: #000; box-shadow: 0 0 50px rgba(120, 80, 255, .25); overflow: hidden; font-size: 24px; line-height: 1.15 }
+    #shopStage canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; image-rendering: crisp-edges }
+    #shHud { position: absolute; left: 2%; top: 2.5%; background: rgba(10, 10, 30, .72); border: .1em solid #fff; padding: .1em .5em; font-size: .8em; max-width: 70%; display: none }
+    #shHint { position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%); background: #fff; color: #111; padding: .05em .7em; font-size: .95em; border-radius: .2em; display: none; white-space: nowrap; box-shadow: .12em .12em 0 #000 }
+    #shDlg { position: absolute; left: 3%; right: 3%; bottom: 4%; background: var(--navy); border: .14em solid #fff; border-radius: .25em; padding: .35em .8em .5em; display: none; box-shadow: .15em .15em 0 #000; min-height: 3.2em }
+    #shDn { color: var(--gold); font-size: .85em; margin-bottom: .1em }
+    #shDt { font-size: 1em; line-height: 1.1 }
+    #shDm { position: absolute; right: .6em; bottom: .2em; font-size: .8em; animation: blink .7s steps(2) infinite }
+    #shTitle { position: absolute; inset: 0; background: rgba(6, 6, 20, .82); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 6%; gap: .35em }
+    #shTitle h1 { margin: 0; font-size: 2.4em; color: var(--red); text-shadow: .07em .07em 0 #fff2, .04em .04em 0 #000; letter-spacing: .05em; font-weight: 400 }
+    #shTitle p { margin: 0; font-size: 1em; color: #dfe3ff }
+    #shTitle small { font-size: .75em; color: #9aa0d0; line-height: 1.15 }
+    #shGo { font-size: 1.2em; padding: .1em 1em; background: var(--red); border: .12em solid #fff; box-shadow: .1em .1em 0 #000; animation: blink 1s steps(2) infinite; margin: .3em 0 }
+    #shMute { position: absolute; right: 1.5%; top: 2%; background: rgba(10, 10, 30, .72); border: .1em solid #fff; font-size: .8em; padding: 0 .4em; box-shadow: none }
+    #shOnline { position: absolute; right: 1.5%; bottom: 2.5%; font-size: .7em; color: #9aa0d0; background: rgba(10, 10, 30, .72); padding: 0 .4em }
+    #shPad { display: none; width: 100%; height: var(--padh); position: relative }
+    #shPad .dp { position: absolute; left: 3%; top: 8px; width: 150px; height: 150px }
+    #shPad button { position: absolute; width: 48px; height: 48px; border-radius: 10px; border: 2px solid #fff6; background: #2a2a52; font-size: 22px; touch-action: none; padding: 0; box-shadow: none }
+    #shPad button.on { background: var(--red) }
+    #shPad .ab { position: absolute; right: 3%; top: 30px }
+    #shPad .ab button { position: static; width: 70px; height: 70px; border-radius: 50%; font-size: 26px }
   </style>
 </head>
 
 <body>
+  <!-- Tiệm game: trang chủ. Mỗi máy Famicom là một phòng; ngồi vào máy trống = tạo phòng, máy có người = vào chơi cùng / xem -->
+  <div id="shop">
+    <div id="shopStage">
+      <canvas id="shCv"></canvas>
+      <div id="shHud"></div>
+      <div id="shHint"></div>
+      <div id="shDlg"><div id="shDn"></div><div id="shDt"></div><span id="shDm">▼</span></div>
+      <button type="button" id="shMute" title="Bật/tắt tiếng (M)">🔊</button>
+      <div id="shOnline"></div>
+      <div id="shTitle">
+        <h1>1990 · TIỆM GAME</h1>
+        <p>Bước vào tiệm, chọn một máy <b style="color:#ffd84a">FAMICOM</b> còn trống rồi ngồi vào chơi luôn!</p>
+        <button type="button" id="shGo">▶ BƯỚC VÀO</button>
+        <small>Di chuyển: WASD / phím mũi tên · Ngồi / nói chuyện: E, Space hoặc Enter · Tắt tiếng: M<br>Máy đang sáng màn hình là có người chơi: lại gần để chơi cùng hoặc đứng xem.</small>
+      </div>
+    </div>
+    <div id="shPad">
+      <div class="dp">
+        <button type="button" data-k="U" style="left:51px;top:0">▲</button>
+        <button type="button" data-k="L" style="left:0;top:51px">◀</button>
+        <button type="button" data-k="R" style="left:102px;top:51px">▶</button>
+        <button type="button" data-k="D" style="left:51px;top:102px">▼</button>
+      </div>
+      <div class="ab"><button type="button" data-k="B" style="margin-right:14px">B</button><button type="button" data-k="A">A</button></div>
+    </div>
+  </div>
+
+  <div class="toasts" id="toast"></div>
   <div class="app">
     <div class="roster" id="roster"></div>
-    <div class="toasts" id="toast"></div>
 
     <div class="stage" id="stage">
       <canvas id="screen" width="256" height="224"></canvas>
       <div class="overlay" id="overlay">
-        <div id="lobby">
-          <button class="primary" type="button" id="lobbyCreate">Tạo phòng</button>
-          <div class="joinrow">
-            <input id="lobbyCode" type="text" placeholder="Mã phòng hoặc liên kết" maxlength="200" autocomplete="off" spellcheck="false">
-            <button type="button" id="lobbyJoin">Vào phòng</button>
+        <div id="picker" style="display:none">
+          <div class="tv-title">CHỌN BĂNG GAME</div>
+          <div class="tv-sub" id="pickerSub">Chọn một băng để cắm vào máy</div>
+          <div class="games" id="gameList"><div class="none">Đang tìm băng…</div></div>
+          <div class="pickrow">
+            <button type="button" id="lobbyRom">📂 Băng của bạn (.nes / .zip)</button>
+            <button type="button" id="pickerClose" style="display:none">▶ Chơi tiếp</button>
           </div>
-        </div>
-        <div id="lobbyHost" style="display:none">
-          <div style="display:flex;gap:8px;margin:10px 0">
+          <div class="linkrow">
             <input id="roomLink" type="text" readonly>
-            <button type="button" id="roomCopy">Sao chép</button>
+            <button type="button" id="roomCopy">Sao chép link mời</button>
           </div>
-          <button class="primary" type="button" id="lobbyRom">Chọn file ROM…</button>
         </div>
         <div id="lobbyWait" style="display:none">
-          <div class="big" id="lobbyWaitTitle">Đang chờ vào phòng…</div>
-          <div class="sub" id="lobbyWaitSub">Game sẽ tự chạy khi chủ phòng nạp ROM.</div>
+          <div class="tv-title" id="lobbyWaitTitle">ĐANG CHỜ…</div>
+          <div class="tv-sub blink" id="lobbyWaitSub">Game sẽ tự chạy khi chủ máy cắm băng.</div>
         </div>
         <div class="err" id="err"></div>
       </div>
+    </div>
+    <div class="tvbar">
+      <button type="button" id="btnEject" title="Rút băng, quay về màn hình chọn game" disabled>⏏ Thoát game</button>
+      <div class="tvbrand">FAMI-VISION <i id="tvLed"></i></div>
+      <button type="button" id="btnLeave" title="Đứng dậy, về tiệm game">🚪 Thoát phòng</button>
     </div>
 
     <div class="toolbar">
@@ -316,7 +436,6 @@
       <button class="ic" id="btnKeys" type="button" title="Phím điều khiển" aria-label="Phím điều khiển">🎮</button>
       <button class="ic" id="btnLink" type="button" title="Sao chép liên kết phòng" aria-label="Sao chép liên kết phòng" style="display:none">🔗</button>
       <button class="ic" id="btnVoice" type="button" title="Bật mic" aria-label="Bật mic" style="display:none">🎤</button>
-      <button class="ic" id="btnLeave" type="button" title="Rời phòng" aria-label="Rời phòng" style="display:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
       <div id="status">Chưa nạp ROM</div>
     </div>
 
@@ -1578,22 +1697,28 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
         return new Uint8Array(await new Response(stream).arrayBuffer());
       }
       async function loadFile(file) {
-        if (!file || !net.ws || net.spec) return;      // chỉ nạp ROM được khi đang ở trong phòng (khán giả thì không)
+        if (!file) return;
+        return loadBytes(() => file.arrayBuffer(), file.name);
+      }
+      // nạp băng game: get() trả về ArrayBuffer (từ file của người dùng hoặc tải từ server)
+      async function loadBytes(get, name) {
+        if (!net.ws || net.spec) return;      // chỉ nạp ROM được khi đang ở trong phòng (khán giả thì không)
         errEl.textContent = '';
         try {
-          let d = new Uint8Array(await file.arrayBuffer());
+          if (net.synced || net.syncing) throw new Error('Không thể đổi băng khi đang chơi cùng người khác');
+          let d = new Uint8Array(await get());
           if (d[0] === 0x50 && d[1] === 0x4B) d = await unzipRom(d);
-          if (net.synced) throw new Error('Không thể đổi ROM khi đang chơi cùng người khác');
           saveSram();
           nes.loadRom(d); lastRom = d;
           audio.init();
-          romName = file.name.replace(/\.(nes|zip)$/i, '');
+          romName = name.replace(/\.(nes|zip)$/i, '');
           loadSram();
           paused = false;
           $('btnReset').disabled = false;
-          overlay.classList.add('hidden');
+          pickerOpen = false; overlay.classList.add('hidden'); refreshUi();
           acc = 0; last = 0;
-          document.title = romName + ' — NES Player';
+          document.title = romName + ' — 1990';
+          netSend({ t: 'game', name: romName });   // hiện tên game trên máy này trong tiệm
           showStatus();
           if (net.ws && net.peer && net.existing) startSync();
         } catch (e) {
@@ -1603,6 +1728,57 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
           statusEl.textContent = 'Nạp ROM thất bại';
         }
       }
+      // ---- màn hình chọn băng game ----
+      let pickerOpen = false, games = null;
+      const CART_COLORS = ['#e0603a', '#3a8ae0', '#ffd84a', '#3ae08a', '#b04ae0', '#dddddd'];
+      function renderGames() {
+        const box = $('gameList'); box.textContent = '';
+        if (!games) { box.innerHTML = '<div class="none">Đang tìm băng…</div>'; return; }
+        if (!games.length) { box.innerHTML = '<div class="none">Tiệm chưa có băng nào (bỏ file .nes vào thư mục public/roms). Hãy dùng băng của bạn.</div>'; return; }
+        const focusFirst = pickerOpen && !document.querySelector('#picker button:focus');
+        games.forEach((g, i) => {
+          const b = document.createElement('button');
+          b.type = 'button'; b.className = 'game'; b.textContent = g.name;
+          b.style.setProperty('--c', CART_COLORS[i % CART_COLORS.length]);
+          b.addEventListener('click', () => {
+            b.blur();
+            statusEl.textContent = 'Đang cắm băng ' + g.name + '…';
+            loadBytes(() => fetch(BASE + g.path.split('/').map(encodeURIComponent).join('/')).then(r => {
+              if (!r.ok) throw new Error('Không tải được băng (' + r.status + ')');
+              return r.arrayBuffer();
+            }), g.name);
+          });
+          box.appendChild(b);
+        });
+        if (focusFirst && box.firstElementChild) box.firstElementChild.focus();   // chọn sẵn băng đầu: bấm Enter là chơi
+      }
+      function fetchGames() {
+        fetch(BASE + 'api/games', { cache: 'no-store' }).then(r => r.json()).then(l => { games = Array.isArray(l) ? l : []; renderGames(); })
+          .catch(() => { games = []; renderGames(); });
+      }
+      function showPicker() {
+        if (!net.ws || net.spec || net.synced || net.syncing) return;
+        pickerOpen = true; errEl.textContent = ''; overlay.classList.remove('hidden');
+        fetchGames(); refreshUi();
+        setTimeout(() => { const b = document.querySelector('#gameList button'); if (b) b.focus(); }, 30);
+      }
+      function hidePicker() {
+        pickerOpen = false;
+        if (nes.loaded) overlay.classList.add('hidden');
+        refreshUi();
+      }
+      // điều khiển menu bằng phím: lên/xuống chọn băng, Enter/Space/E cắm băng, Esc đóng
+      addEventListener('keydown', e => {
+        if (!pickerOpen || keyModalOpen || $('picker').style.display === 'none') return;
+        const list = [...document.querySelectorAll('#picker button')].filter(b => b.offsetParent);
+        const i = list.indexOf(document.activeElement);
+        const mv = { ArrowDown: 1, KeyS: 1, ArrowUp: -1, KeyW: -1 }[e.code];
+        if (mv) { e.preventDefault(); e.stopImmediatePropagation(); const n = list[(i + mv + list.length) % list.length] || list[0]; if (n) n.focus(); }
+        else if ((e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyE') && i >= 0) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) list[i].click(); }
+        else if (e.code === 'Escape' && nes.loaded) { e.preventDefault(); hidePicker(); }
+        else if (e.code !== 'KeyM' && e.code !== 'KeyF') e.stopImmediatePropagation();   // đang ở menu: phím không lọt vào game
+      }, true);
+      $('pickerClose').addEventListener('click', hidePicker);
       function showStatus(fps) {
         if (!nes.loaded) return;
         statusEl.textContent = romName + ' · Mapper ' + nes.cart.mapperId + (nes.cart.battery ? ' · 💾' : '') +
@@ -1611,7 +1787,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       const fileInput = $('file');
       const openPicker = () => { fileInput.value = ''; fileInput.click(); };
       fileInput.addEventListener('change', () => loadFile(fileInput.files[0]));
-      $('btnLoad').addEventListener('click', e => { e.currentTarget.blur(); openPicker(); });
+      $('btnLoad').addEventListener('click', e => { e.currentTarget.blur(); showPicker(); });
       $('lobbyRom').addEventListener('click', openPicker);
       ['dragenter', 'dragover'].forEach(t => addEventListener(t, e => { e.preventDefault(); stage.classList.add('drag'); }));
       ['dragleave', 'drop'].forEach(t => addEventListener(t, e => { e.preventDefault(); if (t === 'drop' || e.target === document.documentElement) stage.classList.remove('drag'); }));
@@ -1626,6 +1802,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       }
       function doReset() { if (nes.loaded && !net.synced && !net.syncing && !net.spec) { saveSram(); nes.reset(); if (sramKey) loadSram(); paused = false; showStatus(); } }
       function toggleFull() {
+        if (!seated) return;                  // đang ở trong tiệm: không có màn hình TV để phóng to
         if (document.fullscreenElement) document.exitFullscreen();
         else if (stage.requestFullscreen) stage.requestFullscreen().catch(() => { });
       }
@@ -1640,6 +1817,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       const BASE = document.querySelector('meta[name=base-route]')?.content || '/';
       const JOIN_AHEAD = 45;               // số frame chừa lại để người mới bắt kịp
       let lastRom = null;
+      let seated = false;                  // đã ngồi vào một máy (rời tiệm, đang ở giao diện TV)
       const net = {
         ws: null, slot: 0, host: false, f: 0, peer: false, existing: false,
         synced: false, syncing: false, sending: false, catchup: false, joinAt: null,
@@ -1843,13 +2021,24 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       // trang chủ: chưa vào phòng -> tạo/vào phòng; chủ phòng -> chọn ROM; người vào -> chờ nhận game
       function refreshUi() {
         const inRoom = !!net.ws;
-        $('lobby').style.display = inRoom ? 'none' : '';
-        $('lobbyHost').style.display = inRoom && net.host ? '' : 'none';
-        $('lobbyWait').style.display = inRoom && !net.host ? '' : 'none';
-        $('btnLoad').style.display = inRoom && !net.synced && !net.syncing && !net.spec ? '' : 'none';
-        $('lobbyWaitTitle').textContent = net.spec ? 'Bạn đang là khán giả' : 'Đang chờ vào phòng…';
-        $('lobbyWaitSub').textContent = net.spec ? 'Game sẽ hiện ra khi nhận xong dữ liệu. Có người chơi thoát thì bạn được vào chơi thay.' : 'Game sẽ tự chạy khi chủ phòng nạp ROM.';
-        $('btnLeave').style.display = inRoom ? '' : 'none';
+        document.body.classList.toggle('inroom', seated);   // mất kết nối vẫn ở lại máy (chơi một mình tiếp), chỉ về tiệm khi bấm rời
+        const canPick = inRoom && !net.spec && !net.synced && !net.syncing;
+        if (pickerOpen && !canPick) { pickerOpen = false; if (nes.loaded) overlay.classList.add('hidden'); }
+        // vừa ngồi vào máy (chủ máy, chưa có băng) -> mở luôn màn hình chọn băng
+        if (canPick && net.host && !nes.loaded && !pickerOpen) { pickerOpen = true; fetchGames(); }
+        const pick = pickerOpen && canPick;
+        $('picker').style.display = pick ? '' : 'none';
+        $('pickerClose').style.display = nes.loaded ? '' : 'none';
+        $('pickerSub').textContent = net.peer ? 'Bạn chơi cùng — chọn băng, cả hai sẽ chơi game này' : 'Ngồi một mình — chọn băng rồi gửi link mời bạn bè';
+        $('lobbyWait').style.display = inRoom && !pick && !nes.loaded ? '' : 'none';
+        $('btnLoad').style.display = canPick ? '' : 'none';
+        $('btnLoad').title = 'Đổi băng game'; $('btnLoad').setAttribute('aria-label', 'Đổi băng game');
+        $('lobbyWaitTitle').textContent = net.spec ? 'ĐỨNG XEM' : 'ĐANG CHỜ…';
+        $('lobbyWaitSub').textContent = net.spec ? 'Đang nhận hình từ máy… Có người chơi đứng dậy thì bạn được ngồi thay.' : 'Game sẽ tự chạy khi chủ máy cắm băng.';
+        $('tvLed').classList.toggle('on', nes.loaded);
+        $('btnLeave').style.display = seated ? '' : 'none';
+        $('btnEject').style.display = net.spec ? 'none' : '';
+        $('btnEject').disabled = !nes.loaded || net.syncing || net.catchup;
         $('btnLink').style.display = inRoom && !net.spec ? '' : 'none';
         voiceUi();
         renderRoster();
@@ -1953,11 +2142,11 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       }
       function receiveLoad(d, name) {
         nes.loadRom(d); lastRom = d; romName = name; sramKey = null; audio.init();   // người vào phòng: tạo sẵn âm thanh, tự chạy khi có thao tác đầu tiên
-        overlay.classList.add('hidden'); document.title = romName + ' — NES Player';
-        paused = false; errEl.textContent = ''; enableButtons();
+        pickerOpen = false; overlay.classList.add('hidden'); document.title = romName + ' — 1990';
+        paused = false; errEl.textContent = ''; enableButtons(); refreshUi();
       }
       function netConnect(first) {
-        netTeardown();
+        netTeardown(); seated = true;
         roomMsg('Đang kết nối…');
         const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + (document.querySelector('meta[name=ws-path]')?.content || '/ws'));
         ws.binaryType = 'arraybuffer';
@@ -2000,6 +2189,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             else roomMsg('Có người vào phòng. Hãy nạp ROM để cùng chơi.');
           } else if (m.t === 'peerleft') {
             const wasLock = net.synced;
+            net.host = true;                           // còn lại một mình: mình làm chủ máy (được chọn băng)
             dropPeer(); showStatus();
             roomMsg(wasLock ? 'Đối phương đã rời phòng, bạn tiếp tục chơi một mình.' : 'Người kia đã rời phòng.');
             if (wasLock) { $('btnReset').disabled = !nes.loaded; }
@@ -2042,6 +2232,10 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
               if (!net.specReady && ++net.specCnt > 20000) { net.specIn = [{}, {}]; net.specCnt = 0; } // chưa được gửi game: tránh phình bộ nhớ
               net.specIn[m.s === 1 ? 1 : 0][m.f] = m.v | 0;
             } else gotRemote(m.f, m.v | 0);
+          } else if (m.t === 'eject') {                // người chơi kia (hoặc người chơi, nếu mình là khán giả) đã rút băng
+            if (!nes.loaded && !net.rx) return;
+            unloadGame(); pickerOpen = false; refreshUi();
+            roomMsg(net.spec ? 'Người chơi đã rút băng, đang chờ băng mới…' : 'Người chơi cùng đã rút băng và đang chọn game khác…');
           } else if (m.t === 'roster') {
             onRoster(m);
           } else if (m.t === 'sig') {
@@ -2070,24 +2264,47 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
             if (m.solo && ready) { showStatus(); }
             refreshUi();
           } else if (m.t === 'error') {
-            netTeardown(); history.replaceState(null, '', BASE);
-            roomMsg((m.msg || 'Lỗi') + ' Bạn có thể tạo phòng mới.');
+            seated = false; netTeardown(); history.replaceState(null, '', BASE);
+            roomMsg((m.msg || 'Lỗi') + ' Hãy chọn một máy khác trong tiệm.');
+            if (window.shop) window.shop.back();
           }
         };
       }
+      // ---- thoát game: rút băng, vẫn ngồi ở máy (quay về màn hình chọn băng) ----
+      // Đang chơi cùng thì máy bên kia và khán giả cũng bị rút băng theo (tin 'eject' qua server).
+      function unloadGame() {
+        saveSram(); sramKey = null;
+        nes.loaded = false; lastRom = null; romName = ''; paused = false; ff = false;
+        nes.apu.rd = nes.apu.wr;                 // bỏ phần tiếng còn trong bộ đệm
+        if (net.rb) { try { net.rb.resolve(); } catch (e) { } }
+        net.rb = null; net.link = null;
+        net.synced = false; net.syncing = false; net.sending = false; net.catchup = false; net.joinAt = null;
+        net.localIn = {}; net.remoteIn = {}; net.rx = null; net.f = 0;
+        net.existing = net.peer;                 // bên nào cắm băng mới trước sẽ gửi game cho bên kia
+        if (net.spec) { net.specReady = false; net.specIn = [{}, {}]; net.specCnt = 0; }
+        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 256, 240);
+        document.title = '1990 - reply'; statusEl.textContent = 'Chưa cắm băng';
+        errEl.textContent = ''; overlay.classList.remove('hidden');
+        enableButtons();
+      }
+      function ejectGame() {
+        if (!nes.loaded || net.spec || net.syncing || net.catchup) return;
+        netSend({ t: 'eject' });
+        unloadGame();
+        pickerOpen = !!net.ws; if (pickerOpen) fetchGames();
+        refreshUi();
+        roomMsg(net.peer ? 'Đã rút băng. Chọn băng mới, người chơi cùng sẽ chơi theo.' : 'Đã rút băng. Chọn băng khác để chơi.');
+      }
+      $('btnEject').addEventListener('click', e => { e.currentTarget.blur(); ejectGame(); });
       // rời phòng -> quay về trang chủ (tải lại trang để dừng game đang chạy)
-      const leaveRoom = () => { netTeardown(); location.replace(BASE); };
+      const leaveRoom = () => {
+        // để tiệm biết vừa đứng dậy từ máy nào (về đứng cạnh máy đó, không phải ở cửa)
+        const code = location.pathname.slice(BASE.length).match(/^([A-Za-z0-9]{4,12})\/?$/);
+        try { sessionStorage.setItem('shop-back', code ? code[1].toUpperCase() : '-'); } catch (e) { }
+        netTeardown(); location.replace(BASE);
+      };
       $('btnVoice').addEventListener('click', e => { e.currentTarget.blur(); if (voice.on) voiceStop(true); else voiceStart(); });
       $('btnLeave').addEventListener('click', e => { e.currentTarget.blur(); leaveRoom(); });
-      $('lobbyCreate').addEventListener('click', () => netConnect({ t: 'create' }));
-      function lobbyJoin() {
-        const m = $('lobbyCode').value.trim().match(/([A-Za-z0-9]{4,12})\/?$/);
-        if (!m) { errEl.textContent = 'Hãy nhập mã phòng (4–12 ký tự) hoặc dán liên kết phòng.'; return; }
-        errEl.textContent = '';
-        netConnect({ t: 'join', room: m[1] });
-      }
-      $('lobbyJoin').addEventListener('click', lobbyJoin);
-      $('lobbyCode').addEventListener('keydown', e => { if (e.key === 'Enter') lobbyJoin(); });
       function copyRoomLink() {
         const link = $('roomLink').value || location.href;
         const done = () => toast('Đã sao chép liên kết phòng.');
@@ -2100,6 +2317,7 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       // người được mời: mở /:id là tự vào phòng
       const roomPath = location.pathname.startsWith(BASE) ? location.pathname.slice(BASE.length).match(/^([A-Za-z0-9]{4,12})\/?$/) : null;
       if (roomPath) { netConnect({ t: 'join', room: roomPath[1] }); }
+      else history.replaceState(null, '', BASE);
 
       // ---- main loop ----
       const FRAME_MS = 1000 / 60.0988;
@@ -2144,7 +2362,513 @@ BEQ r,SBC iy,NOP i,ISB iy,NOP zx,SBC zx,INC zx,ISB zx,SED i,SBC aby,NOP i,ISB ab
       } catch (e) { }
 
       // depuração / testes
-      window.nesApp = { nes, loadFile, net };
+      window.nesApp = {
+        nes, loadFile, net,
+        // tiệm game gọi khi người chơi ngồi vào máy: máy trống -> tạo phòng, máy có người -> vào phòng đó
+        sit(room) { netConnect(room ? { t: 'join', room } : { t: 'create' }); },
+        seated: () => seated,
+        isMuted: () => muted,
+        toggleMute,
+        base: BASE,
+        wsUrl: () => (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + (document.querySelector('meta[name=ws-path]')?.content || '/ws')
+      };
+    })();
+  </script>
+
+  <script>
+    // ====================================================================
+    //  TIỆM GAME (trang chủ)
+    //  Mỗi máy Famicom là một phòng chơi. Danh sách phòng lấy trực tiếp từ server (WebSocket, tin 'lobby' / 'rooms').
+    //  Máy có người (phòng đang mở) sáng màn hình + có người ngồi; máy trống thì tối. Lúc nào cũng còn ít nhất một máy trống.
+    //  Ngồi vào máy trống -> tạo phòng mới; ngồi vào máy có 1 người -> chơi cùng; máy đủ 2 người -> đứng xem.
+    // ====================================================================
+    (() => {
+      'use strict';
+      const app = window.nesApp; if (!app) return;
+      const W = 480, H = 300;
+      const $ = id => document.getElementById(id);
+      const cv = $('shCv'), ctx = cv.getContext('2d');
+      cv.width = W; cv.height = H;
+      const stage = $('shopStage'), shopEl = $('shop');
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+      const FONT = 'VT323, ui-monospace, monospace';
+      const visible = () => !app.seated();
+      const ss = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { } } };
+
+      /* ---------- layout / touch ---------- */
+      const isTouch = ('ontouchstart' in window) || matchMedia('(pointer:coarse)').matches;
+      function resize() {
+        if (isTouch) { shopEl.style.setProperty('--padh', '170px'); $('shPad').style.display = 'block'; }
+        stage.style.fontSize = (stage.clientWidth / 32) + 'px';
+      }
+      addEventListener('resize', resize); resize();
+
+      /* ---------- âm thanh hiệu ứng (dùng chung nút tắt tiếng với máy chơi game) ---------- */
+      let AC = null;
+      function audio() {
+        if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { } }
+        if (AC && AC.state === 'suspended') AC.resume();
+      }
+      function tone(f, d, type, v, f2, delay) {
+        if (!AC || app.isMuted() || !visible()) return;
+        type = type || 'square'; v = v || .05; delay = delay || 0;
+        const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();
+        o.type = type; o.frequency.setValueAtTime(f, t);
+        if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
+        g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+        o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + d + .03);
+      }
+      const sfx = {
+        blip: () => tone(660, .05, 'square', .03),
+        no: () => tone(180, .22, 'square', .05, 110),
+        pick: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, .14, 'square', .05, null, i * .09)),
+        ding: () => { tone(988, .08, 'square', .04); tone(1319, .2, 'square', .04, null, .07); }
+      };
+      $('shMute').addEventListener('click', e => { e.stopPropagation(); e.currentTarget.blur(); audio(); app.toggleMute(); });
+
+      /* ---------- phép chiếu (camera 3D, sprite 2D) ---------- */
+      const F = 240, OY = 15, HH = 6.5, DD = 7, LL = Math.hypot(HH, DD), SIN = HH / LL, COS = DD / LL;
+      const cam = { x: 0, z: 0 };
+      function proj(x, y, z) {
+        const rx = x - cam.x, ry = y - HH, rz = z - (cam.z + DD);
+        const yc = ry * COS - rz * SIN, zc = -ry * SIN - rz * COS;
+        const s = F / Math.max(zc, .5);
+        return [W / 2 + rx * s, H / 2 + OY - yc * s, s];
+      }
+      function poly(pts, fill, stroke) {
+        ctx.beginPath();
+        for (let i = 0; i < pts.length; i++) { const q = proj(pts[i][0], pts[i][1], pts[i][2]); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }
+        ctx.closePath();
+        if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+        if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
+      }
+      function sh(h, f) {
+        const n = parseInt(h.slice(1), 16);
+        const r = Math.min(255, Math.round((n >> 16) * f)), g = Math.min(255, Math.round(((n >> 8) & 255) * f)), b = Math.min(255, Math.round((n & 255) * f));
+        return `rgb(${r},${g},${b})`;
+      }
+      const C = h => ({ top: sh(h, 1.18), front: h, side: sh(h, .72) });
+      const LINE = 'rgba(0,0,0,.4)';
+      function dbox(b) {
+        const x = b.x, z = b.z, w = b.w, d = b.d, y0 = b.y || 0, y1 = y0 + b.h, c = b.c;
+        if (cam.x < x) poly([[x, y0, z], [x, y0, z + d], [x, y1, z + d], [x, y1, z]], c.side, LINE);
+        else if (cam.x > x + w) poly([[x + w, y0, z], [x + w, y0, z + d], [x + w, y1, z + d], [x + w, y1, z]], c.side, LINE);
+        poly([[x, y0, z + d], [x + w, y0, z + d], [x + w, y1, z + d], [x, y1, z + d]], c.front, LINE);
+        poly([[x, y1, z], [x + w, y1, z], [x + w, y1, z + d], [x, y1, z + d]], c.top, LINE);
+      }
+      const faceRect = (x, y, z, w, h, fill, stroke) => poly([[x, y, z], [x + w, y, z], [x + w, y + h, z], [x, y + h, z]], fill, stroke);
+      const floorRect = (x, z, w, d, fill, stroke) => poly([[x, 0, z], [x + w, 0, z], [x + w, 0, z + d], [x, 0, z + d]], fill, stroke);
+      function lbl(t, x, y, z, col, size) {
+        const q = proj(x, y, z);
+        ctx.font = (size || 17) + 'px ' + FONT; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.lineJoin = 'round';
+        ctx.strokeText(t, q[0], q[1]); ctx.fillStyle = col || '#fff'; ctx.fillText(t, q[0], q[1]);
+      }
+      function arrow(x, y, z, t) {
+        const q = proj(x, y, z), b = Math.sin(t * 6) * 3;
+        ctx.fillStyle = '#ffd84a'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(q[0] - 6, q[1] - 12 + b); ctx.lineTo(q[0] + 6, q[1] - 12 + b); ctx.lineTo(q[0], q[1] - 2 + b); ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+
+      /* ---------- sprite pixel ---------- */
+      const PAL = { h: '#3a2414', s: '#f2c79b', e: '#1a1a1a', r: '#d83a2e', b: '#2f58c0', k: '#2a1a12' };
+      const PAL_NPC = { h: '#c9c9c9', s: '#f2c79b', e: '#1a1a1a', r: '#2e9e4f', b: '#4a3a2a', k: '#1a1208' };
+      const PALS = [
+        { h: '#e8c040', s: '#f2c79b', e: '#1a1a1a', r: '#3a8ae0', b: '#444455', k: '#222' },
+        { h: '#222222', s: '#d9a878', e: '#1a1a1a', r: '#3ae08a', b: '#6a3a8a', k: '#111' },
+        { h: '#8a3a1a', s: '#f2c79b', e: '#1a1a1a', r: '#b04ae0', b: '#333344', k: '#222' },
+        { h: '#ddd0a0', s: '#e8b88a', e: '#1a1a1a', r: '#ffd84a', b: '#2a4a6a', k: '#111' }
+      ];
+      const body = ['...rrrr...', '.rrrrrrrr.', '.srrrrrrs.', '..rrrrrr..', '..bbbbbb..'];
+      const SPR = {
+        D0: ['...hhhh...', '..hhhhhh..', '..hssssh..', '..hesseh..', '..hssssh..', ...body, '..bb..bb..', '..kk..kk..'],
+        D1: ['...hhhh...', '..hhhhhh..', '..hssssh..', '..hesseh..', '..hssssh..', ...body, '.bb....bb.', '.kk....kk.'],
+        U0: ['...hhhh...', '..hhhhhh..', '..hhhhhh..', '..hhhhhh..', '..hhhhhh..', ...body, '..bb..bb..', '..kk..kk..'],
+        U1: ['...hhhh...', '..hhhhhh..', '..hhhhhh..', '..hhhhhh..', '..hhhhhh..', ...body, '.bb....bb.', '.kk....kk.'],
+        S0: ['...hhhh...', '..hhhhhh..', '..hhssss..', '..hhssse..', '..hhssss..', '...rrrr...', '..rrrrrr..', '..rrrrrs..', '..rrrrrr..', '..bbbbbb..', '..bb.bb...', '..kk.kk...'],
+        S1: ['...hhhh...', '..hhhhhh..', '..hhssss..', '..hhssse..', '..hhssss..', '...rrrr...', '..rrrrrr..', '..rrrrrs..', '..rrrrrr..', '..bbbbbb..', '...bbbb...', '...kkkk...']
+      };
+      function spr(rows, pal, x, y, ps, flip) {
+        const w = rows[0].length, h = rows.length, x0 = x - w * ps / 2, y0 = y - h * ps;
+        for (let j = 0; j < h; j++) {
+          const row = rows[j];
+          for (let i = 0; i < w; i++) {
+            const c = row[flip ? w - 1 - i : i]; if (c === '.') continue;
+            ctx.fillStyle = pal[c];
+            const a = Math.round(x0 + i * ps), b = Math.round(y0 + j * ps), a2 = Math.round(x0 + (i + 1) * ps), b2 = Math.round(y0 + (j + 1) * ps);
+            ctx.fillRect(a, b, a2 - a, b2 - b);
+          }
+        }
+      }
+      function drawActor(x, z, pal, dir, moving, walk, lift) {
+        const q0 = proj(x, 0, z), q = proj(x, lift || 0, z), sx = q[0], sy = q[1], s = q[2];
+        ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(q0[0], q0[1], .42 * s, .17 * s, 0, 0, 7); ctx.fill();
+        const f = moving ? (Math.floor(walk * 2) % 2) : 0, bob = moving ? Math.abs(Math.sin(walk * Math.PI * 2)) * .06 * s : 0;
+        let rows, flip = false;
+        if (dir === 'D') rows = SPR['D' + f]; else if (dir === 'U') rows = SPR['U' + f]; else { rows = SPR['S' + f]; flip = dir === 'L'; }
+        spr(rows, pal, sx, sy - bob, s * .14, flip);
+      }
+
+      /* ---------- trạng thái ---------- */
+      const S = { scene: 'title', t: 0, dialog: null, fade: null, busy: false };
+      const player = { x: 0, z: 5.3, dir: 'U', walk: 0, moving: false };
+      const keys = new Set();
+      let WD = null, cur = null;
+
+      /* ---------- máy trong tiệm <-> phòng trên server ---------- */
+      // Gán cố định mã phòng -> số máy để máy không nhảy chỗ khi có phòng khác đóng/mở.
+      let rooms = [], online = false;
+      const seatOf = new Map();           // mã phòng -> chỉ số máy (giữ qua lần tải lại trang khi rời máy)
+      try { for (const [k, v] of JSON.parse(ss.get('shop-seats') || '[]')) if (typeof k === 'string' && Number.isInteger(v) && v >= 0 && v < 64) seatOf.set(k, v); } catch (e) { }
+      // Vừa rời máy (trang tải lại): về đứng cạnh máy đó. 'shop-back' = mã phòng vừa rời (do nút Thoát phòng ghi),
+      // 'shop-seat' = số máy đã ngồi (do tiệm ghi lúc ngồi; vào phòng bằng link thì không có).
+      const ssDel = k => { try { sessionStorage.removeItem(k); } catch (e) { } };
+      if (app.seated()) ssDel('shop-seat');          // mở trang bằng link phòng: không ngồi từ tiệm
+      const backRaw = ss.get('shop-back'); ssDel('shop-back');
+      const back = backRaw && backRaw !== '-' ? backRaw : null;
+      let backIdx = parseInt(ss.get('shop-seat'), 10); ssDel('shop-seat');
+      if (!Number.isInteger(backIdx) || backIdx < 0 || backIdx >= 64) backIdx = null;
+      if (back && backIdx !== null) { for (const [k, v] of [...seatOf]) if (v === backIdx && k !== back) seatOf.delete(k); seatOf.set(back, backIdx); }
+      let returning = backRaw !== null && (back !== null || backIdx !== null);   // chờ có danh sách phòng rồi đặt chỗ đứng
+      const saveSeats = () => ss.set('shop-seats', JSON.stringify([...seatOf]));
+      function stations() {
+        const live = new Set(rooms.map(r => r.room));
+        for (const k of [...seatOf.keys()]) if (!live.has(k)) seatOf.delete(k);
+        const used = new Set(seatOf.values());
+        for (const r of rooms) if (!seatOf.has(r.room)) { let i = 0; while (used.has(i)) i++; seatOf.set(r.room, i); used.add(i); }
+        let n = Math.max(4, ...[...used].map(i => i + 1));
+        while (used.size >= n) n++;                       // luôn còn ít nhất 1 máy trống
+        const list = Array.from({ length: n }, () => null);
+        for (const r of rooms) list[seatOf.get(r.room)] = r;
+        saveSeats();
+        return list;
+      }
+
+      /* ---------- tiệm ---------- */
+      function famicomModel(cx, cz, y) {
+        dbox({ x: cx - .75, z: cz - .4, w: 1.5, d: .65, h: .32, y, c: { top: '#f6eedb', front: '#ddd3bb', side: '#b9af97' } });
+        dbox({ x: cx - .75, z: cz + .25, w: 1.5, d: .32, h: .24, y, c: { top: '#c4343a', front: '#962027', side: '#741a1f' } });
+        dbox({ x: cx - .5, z: cz - .25, w: 1, d: .28, h: .02, y: y + .32, c: { top: '#222', front: '#222', side: '#222' } });
+        dbox({ x: cx + .35, z: cz + .0, w: .3, d: .2, h: .04, y: y + .32, c: { top: '#b0262c', front: '#b0262c', side: '#b0262c' } });
+      }
+      function cartOn(cx, cz, y, col) {      // băng game đang cắm trên máy
+        dbox({ x: cx - .35, z: cz - .22, w: .7, d: .14, h: .42, y: y + .32, c: C(col) });
+      }
+      const CART = ['#e0603a', '#3a8ae0', '#ffd84a', '#3ae08a', '#b04ae0', '#dddddd'];
+      const hash = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); };
+      const short = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+
+      function buildShop() {
+        const st = stations(), n = st.length, SP = 4.4;
+        const hw = Math.max(10, n * SP / 2 + 1.2);
+        const w = { objs: [], solids: [], inter: [], minX: -hw, maxX: hw, minZ: -7, maxZ: 7, cam: { x0: -hw + 6.5, x1: hw - 6.5, z0: -2.5, z1: 3.2 }, st };
+        const addBox = (b, solid) => { w.objs.push({ z: b.z + b.d, f: () => dbox(b) }); if (solid !== false) w.solids.push({ x: b.x, z: b.z, w: b.w, d: b.d }); };
+        w.back = () => {
+          poly([[-hw, 0, -7], [hw, 0, -7], [hw, 5, -7], [-hw, 5, -7]], '#2a2a52');
+          poly([[-hw, 0, -7], [hw, 0, -7], [hw, 1.3, -7], [-hw, 1.3, -7]], '#1c1c3a');
+          for (let i = -hw + 1; i < hw; i += 2) poly([[i, 1.3, -7], [i + .15, 1.3, -7], [i + .15, 5, -7], [i, 5, -7]], '#31315e');
+          poly([[-hw, 0, -7], [-hw, 0, 11], [-hw, 5, 11], [-hw, 5, -7]], '#202044');
+          poly([[hw, 0, -7], [hw, 0, 11], [hw, 5, 11], [hw, 5, -7]], '#202044');
+          floorRect(-hw, -7, hw * 2, 14, '#3b3358');
+          for (let i = 0; i < Math.ceil(hw); i++) for (let j = 0; j < 7; j++) if ((i + j) & 1) floorRect(-hw + i * 2, -7 + j * 2, Math.min(2, hw * 2 - i * 2), 2, '#4b4272');
+          floorRect(-2, 5.6, 4, 1.4, '#8a2a2a', '#000'); floorRect(-1.8, 5.8, 3.6, 1, '#a83a3a');
+          const posters = [[-hw + .6, 2.2, '#e0603a', '#ffd84a'], [-2.9, 3.1, '#3a8ae0', '#fff'], [2.2, 3.1, '#7a3ae0', '#ffd84a'], [hw - 2, 2.4, '#3ae08a', '#222']];
+          posters.forEach(p => { faceRect(p[0], p[1], -6.98, 1.3, 1.7, p[2], '#000'); faceRect(p[0] + .2, p[1] + .25, -6.97, .9, .5, p[3]); faceRect(p[0] + .2, p[1] + 1, -6.97, .9, .3, '#0006'); });
+          const q = proj(0, 3.3, -6.95), on = Math.sin(S.t * 3) > -.85;
+          ctx.save(); ctx.font = '26px ' + FONT; ctx.textAlign = 'center';
+          ctx.shadowColor = '#ff3fd0'; ctx.shadowBlur = on ? 10 : 2; ctx.fillStyle = on ? '#ff7ae6' : '#8a3a7a';
+          ctx.fillText('TIỆM GAME 1990', q[0], q[1]); ctx.restore();
+          [-hw + 1.5, hw - 6.5].forEach(x0 => {
+            const fz = -6.3 + .01;
+            for (let r = 0; r < 3; r++) for (let c = 0; c < 9; c++) {
+              const col = CART[(r * 3 + c * 2) % CART.length];
+              faceRect(x0 + .1 + c * .54, .35 + r * .82, fz, .44, .62, col, '#000');
+              faceRect(x0 + .17 + c * .54, .55 + r * .82, fz, .3, .3, '#fff9');
+            }
+          });
+        };
+        [-hw + 1.5, hw - 6.5].forEach(x => addBox({ x, z: -7, w: 5, d: .7, h: 2.8, c: C('#6b4a2e') }));
+        addBox({ x: -2.5, z: -5.6, w: 5, d: 1.2, h: 1.1, c: C('#8a5a2b') });
+        w.objs.push({ z: -4.3, f: () => dbox({ x: 1.2, z: -5.3, w: .9, d: .6, h: .4, y: 1.1, c: C('#3a3a44') }) });
+        w.objs.push({ z: -6.4, f: () => drawActor(0, -6.4, PAL_NPC, 'D', false, 0) });
+        [[-hw + .6, '#5a2a8a'], [hw - 2.1, '#1a6a8a']].forEach(a => {
+          addBox({ x: a[0], z: -4.6, w: 1.5, d: 1.3, h: 3.2, c: C(a[1]) });
+          w.objs.push({ z: -3.29, f: () => {
+            const fl = Math.sin(S.t * 8 + a[0]) > 0;
+            faceRect(a[0] + .2, 1.9, -3.28, 1.1, 1, fl ? '#6fe8ff' : '#2aa0c0', '#000');
+            faceRect(a[0] + .35, 1.2, -3.28, .8, .3, '#222');
+            faceRect(a[0] + .5, 1.28, -3.27, .14, .14, '#f33'); faceRect(a[0] + .8, 1.28, -3.27, .14, .14, '#ff3');
+          } });
+        });
+        [[-hw + .4, 5.2], [hw - 1.3, 5.2]].forEach(p => {
+          addBox({ x: p[0], z: p[1], w: .9, d: .9, h: .7, c: C('#b5651d') });
+          w.objs.push({ z: p[1] + .95, f: () => dbox({ x: p[0] - .15, z: p[1] - .15, w: 1.2, d: 1.2, h: 1.3, y: .7, c: C('#2e9e4f') }) });
+        });
+
+        // các máy Famicom: mỗi máy một bàn + màn hình + 2 ghế (P1, P2)
+        st.forEach((r, i) => {
+          const sx = (i - (n - 1) / 2) * SP, num = i + 1;
+          const occ = !!r, full = occ && r.players >= 2, game = occ ? r.game : '';
+          const col = game ? CART[hash(game) % CART.length] : null;
+          addBox({ x: sx - 1.6, z: -2.1, w: 3.2, d: 1.2, h: .9, c: C('#8a5a2b') });
+          addBox({ x: sx - 1.05, z: 0, w: .7, d: .7, h: .55, c: C('#b02a30') });
+          addBox({ x: sx + .35, z: 0, w: .7, d: .7, h: .55, c: C('#b02a30') });
+          w.objs.push({ z: -.89, f: () => {
+            dbox({ x: sx - 1.5, z: -1.95, w: 1.5, d: .95, h: 1.25, y: .9, c: { top: '#55555f', front: '#3a3a44', side: '#2a2a32' } });
+            const fz = -1.0;
+            if (occ && game) {                 // đang chơi: cảnh game chạy trên màn hình
+              faceRect(sx - 1.35, 1.1, fz, 1.2, .85, '#5c94fc');
+              faceRect(sx - 1.35, 1.1, fz, 1.2, .2, '#c84c0c');
+              faceRect(sx - 1.35, 1.3, fz, 1.2, .05, '#58d854');
+              faceRect(sx - 1.1, 1.35, fz, .1, .18, '#d83a2e');
+              const bx = (S.t * .7 + i * .37) % 1;
+              faceRect(sx - 1.35 + 1.05 - bx * 1.0, 1.35, fz, .12, .15, '#7c2c04');
+              faceRect(sx - 1.35, 1.1, fz, 1.2, .85, Math.sin(S.t * 20 + i) > 0 ? 'rgba(255,255,255,.1)' : 'rgba(0,0,0,.06)');
+            } else if (occ) {                  // đã có người ngồi nhưng chưa cắm băng: màn hình xanh chờ
+              faceRect(sx - 1.35, 1.1, fz, 1.2, .85, '#1a2a8a', '#000');
+              if (Math.sin(S.t * 4) > 0) faceRect(sx - 1.1, 1.45, fz, .7, .1, '#ffd84a');
+            } else {
+              faceRect(sx - 1.35, 1.1, fz, 1.2, .85, '#0c1612', '#000');
+              if (Math.sin(S.t * 4) > 0) faceRect(sx - 1.0, 1.4, fz, .5, .08, '#9fffc8');
+            }
+            faceRect(sx - .14, 1.1, fz, .1, .1, occ ? '#3f3' : '#511');
+            famicomModel(sx + .8, -1.5, .9);
+            if (col) cartOn(sx + .8, -1.5, .9, col);
+          } });
+          if (occ) {
+            const p = PALS[hash(r.room) % PALS.length], p2 = PALS[(hash(r.room) + 1) % PALS.length];
+            w.objs.push({ z: .85, f: () => drawActor(sx - .7, .35, p, 'U', false, 0, .55 + Math.abs(Math.sin(S.t * 7 + i)) * .03) });
+            if (full) w.objs.push({ z: .86, f: () => drawActor(sx + .7, .35, p2, 'U', false, 0, .55 + Math.abs(Math.sin(S.t * 6 + i)) * .03) });
+            for (let k = 0; k < Math.min(3, r.specs); k++) {   // khách đứng xem phía sau
+              const pk = PALS[(hash(r.room) + 2 + k) % PALS.length], zx = sx - .9 + k * .9;
+              w.objs.push({ z: 1.95, f: () => drawActor(zx, 1.85, pk, 'U', false, 0) });
+              w.solids.push({ x: zx - .3, z: 1.6, w: .6, d: .5 });
+            }
+          }
+          const label = !occ ? 'Ngồi vào máy ' + num + ' (máy trống)'
+            : full ? 'Đứng xem máy ' + num + (game ? ' · ' + short(game, 18) : '')
+              : 'Ngồi chơi cùng ở máy ' + num + (game ? ' · ' + short(game, 18) : '');
+          w.inter.push({ x: sx, z: .4, r: 1.9, ay: 1.8, label, st: { r, num, sx, game }, fn: () => sit(r, num, i) });
+        });
+        w.inter.push({ x: 0, z: -5, r: 2.3, ay: 2.6, label: 'Nói chuyện với chủ tiệm', fn: talk });
+        w.top = () => {
+          st.forEach((r, i) => {
+            const sx = (i - (n - 1) / 2) * SP;
+            lbl('MÁY ' + (i + 1), sx - .75, 3.55, -1.5, '#fff');
+            if (!r) lbl('TRỐNG', sx - .75, 2.95, -1.5, '#8affa0');
+            else {
+              // nhãn ngắn để không đè lên nhãn của máy bên cạnh (mỗi máy rộng ~14 ký tự)
+              lbl(r.game ? short(r.game, 14) : 'CHỌN BĂNG…', sx - .75, 2.95, -1.5, r.game ? '#ffd84a' : '#9aa0d0', 15);
+              lbl((r.players >= 2 ? 'ĐẦY' : 'CÒN 1 GHẾ') + (r.specs ? ' · ' + r.specs + ' XEM' : ''), sx - .75, 2.45, -1.5, r.players >= 2 ? '#ff8a7a' : '#8affa0', 15);
+            }
+          });
+        };
+        return w;
+      }
+      // đứng ngay sau ghế của máy idx, quay mặt ra (vừa đứng dậy)
+      function standAt(idx) {
+        const n = WD.st.length; idx = Math.min(idx, n - 1);
+        player.x = (idx - (n - 1) / 2) * 4.4; player.z = 1.5; player.dir = 'D';
+        snapCam();
+      }
+      function rebuild(fromServer) {
+        WD = buildShop();
+        if (returning) {
+          const idx = back && seatOf.has(back) ? seatOf.get(back) : backIdx;
+          if (idx !== null && idx !== undefined) standAt(idx);
+          if (fromServer) returning = false;          // đã có danh sách phòng thật: chỗ đứng đã đúng
+        }
+        player.x = clamp(player.x, WD.minX + .7, WD.maxX - .7);
+        if (hitSolid(player.x, player.z)) player.z = 1.4;     // máy mới mọc ra chỗ đang đứng: lùi ra
+        if (hitSolid(player.x, player.z)) player.z = 3.2;
+        updOnline();
+      }
+      function updOnline() {
+        const busy = rooms.length, people = rooms.reduce((a, r) => a + r.players + r.specs, 0);
+        $('shOnline').textContent = online ? (busy ? busy + ' máy đang chạy · ' + people + ' người trong tiệm' : 'Tiệm đang vắng') : 'Đang kết nối tiệm…';
+      }
+
+      /* ---------- vào máy ---------- */
+      function sit(r, num, idx) {
+        if (S.busy) return;
+        if (r && !rooms.some(x => x.room === r.room)) { sfx.no(); say([{ n: 'Chủ tiệm', t: 'Máy này vừa có người đứng dậy rồi, cháu chọn máy khác nhé.' }]); return; }
+        S.busy = true; sfx.pick(); setObj('');
+        ss.set('shop-seat', String(idx)); saveSeats();     // nhớ máy đã ngồi để lúc đứng dậy quay về đúng chỗ
+        const text = !r ? 'MÁY ' + num : r.players >= 2 ? 'ĐỨNG XEM MÁY ' + num : 'NGỒI CÙNG MÁY ' + num;
+        fadeTo(text, () => { ss.set('shop-seen', '1'); keys.clear(); app.sit(r ? r.room : null); }, () => { S.busy = false; }, .2);
+      }
+      function talk() {
+        const free = WD.st.filter(r => !r).length, half = rooms.filter(r => r.players === 1);
+        const lines = [{ n: 'Chủ tiệm', t: rooms.length ? 'Đang có ' + rooms.length + ' máy chạy. Máy sáng màn hình là có người chơi, máy tối là còn trống.' : 'Hôm nay tiệm vắng quá! Máy nào cũng trống, cháu chọn đại một máy mà ngồi.' }];
+        if (half.length) lines.push({ n: 'Chủ tiệm', t: 'Máy ghi "CÒN 1 GHẾ" thì ngồi vào chơi cùng được. Máy đủ 2 người thì đứng sau xem.' });
+        lines.push({ n: 'Chủ tiệm', t: 'Ngồi vào máy trống là được chọn băng game. Muốn rủ bạn thì gửi link mời ở màn hình chọn băng. Còn ' + free + ' máy trống.' });
+        say(lines);
+      }
+      // bị từ chối vào phòng (phòng vừa đóng): quay lại tiệm
+      window.shop = { back() { S.busy = false; S.fade = null; keys.clear(); if (S.scene === 'title') start(true); } };
+
+      /* ---------- kết nối xem danh sách phòng ---------- */
+      let ws = null, retry = 0;
+      function connect() {
+        if (app.seated()) return;
+        try { ws = new WebSocket(app.wsUrl()); } catch (e) { return; }
+        ws.onopen = () => { retry = 0; online = true; ws.send(JSON.stringify({ t: 'lobby' })); updOnline(); };
+        ws.onmessage = ev => {
+          let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+          if (m.t !== 'rooms' || !Array.isArray(m.list)) return;
+          const before = rooms.length;
+          rooms = m.list.filter(r => r && typeof r.room === 'string').map(r => ({ room: r.room, players: r.players | 0, specs: r.specs | 0, game: String(r.game || '') }));
+          if (S.scene === 'shop' && rooms.length > before) sfx.ding();
+          rebuild(true);
+        };
+        ws.onclose = () => {
+          online = false; ws = null; updOnline();
+          if (!app.seated()) setTimeout(connect, Math.min(8000, 1000 * ++retry));
+        };
+      }
+      // đã ngồi vào máy: ngắt kết nối xem tiệm (trang tải lại khi rời máy)
+      setInterval(() => { if (app.seated() && ws) { const w = ws; ws = null; w.onclose = null; try { w.close(); } catch (e) { } } else if (!app.seated() && !ws && online === false && retry === 0) connect(); }, 1000);
+
+      /* ---------- helpers ---------- */
+      function snapCam() { const c = WD.cam; cam.x = clamp(player.x, c.x0, c.x1); cam.z = clamp(player.z, c.z0, c.z1); }
+      function setObj(t) { const h = $('shHud'); h.textContent = t; h.style.display = t ? 'block' : 'none'; }
+      let lastHint = '';
+      function setHint(t) { if (t !== lastHint) { lastHint = t; const h = $('shHint'); h.textContent = t; h.style.display = t ? 'block' : 'none'; } }
+      function nearInter() {
+        let best = null, bd = 1e9;
+        for (const it of WD.inter) { const d = Math.hypot(it.x - player.x, it.z - player.z); if (d < it.r && d < bd) { bd = d; best = it; } }
+        return best;
+      }
+      function hitSolid(x, z) {
+        const r = .3;
+        for (const s of WD.solids) if (x + r > s.x && x - r < s.x + s.w && z + r > s.z && z - r < s.z + s.d) return true;
+        return false;
+      }
+      function tryMove(dx, dz) {
+        const nx = clamp(player.x + dx, WD.minX + .7, WD.maxX - .7); if (!hitSolid(nx, player.z)) player.x = nx;
+        const nz = clamp(player.z + dz, WD.minZ + .7, WD.maxZ - .4); if (!hitSolid(player.x, nz)) player.z = nz;
+      }
+
+      /* ---------- hội thoại / chuyển cảnh ---------- */
+      function say(lines, cb) {
+        S.dialog = { lines: lines.map(l => typeof l === 'string' ? { n: '', t: l } : l), i: 0, c: 0, cb };
+        $('shDlg').style.display = 'block';
+      }
+      function advance() {
+        const d = S.dialog, line = d.lines[d.i];
+        if (d.c < line.t.length) { d.c = line.t.length; return; }
+        sfx.blip(); d.i++; d.c = 0;
+        if (d.i >= d.lines.length) { S.dialog = null; $('shDlg').style.display = 'none'; if (d.cb) d.cb(); }
+      }
+      function updDlg(dt) {
+        const d = S.dialog; if (!d) return;
+        const line = d.lines[d.i]; d.c = Math.min(line.t.length, d.c + dt * 55);
+        $('shDn').textContent = line.n; $('shDt').textContent = line.t.slice(0, Math.floor(d.c));
+        $('shDm').style.visibility = d.c >= line.t.length ? 'visible' : 'hidden';
+      }
+      function fadeTo(text, cb, after, hold) { S.fade = { ph: 0, t: 0, text, cb, after, hold: hold || 1.1 }; }
+      function updFade(dt) {
+        const f = S.fade; if (!f) return;
+        f.t += dt;
+        if (f.ph === 0 && f.t >= .5) { f.ph = 1; f.t = 0; if (f.cb) f.cb(); }
+        else if (f.ph === 1 && f.t >= f.hold) { f.ph = 2; f.t = 0; }
+        else if (f.ph === 2 && f.t >= .5) { const a = f.after; S.fade = null; if (a) a(); }
+      }
+      function renderFade() {
+        const f = S.fade; if (!f) return;
+        const a = clamp(f.ph === 0 ? f.t / .5 : f.ph === 1 ? 1 : 1 - f.t / .5, 0, 1);
+        ctx.fillStyle = 'rgba(0,0,0,' + a + ')'; ctx.fillRect(0, 0, W, H);
+        if (f.text && a > .5) {
+          ctx.globalAlpha = (a - .5) * 2; ctx.font = '30px ' + FONT; ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+          ctx.fillText(f.text, W / 2, H / 2); ctx.globalAlpha = 1;
+        }
+      }
+
+      /* ---------- cập nhật / vẽ ---------- */
+      function update(dt) {
+        const locked = S.dialog || S.fade;
+        let vx = 0, vz = 0;
+        if (!locked && S.scene !== 'title') {
+          vx = (keys.has('R') ? 1 : 0) - (keys.has('L') ? 1 : 0);
+          vz = (keys.has('D') ? 1 : 0) - (keys.has('U') ? 1 : 0);
+        }
+        player.moving = !!(vx || vz);
+        if (player.moving) {
+          const l = Math.hypot(vx, vz), sp = 4.2;
+          tryMove(vx / l * sp * dt, vz / l * sp * dt);
+          player.walk += dt * 3;
+          player.dir = vx ? (vx > 0 ? 'R' : 'L') : (vz > 0 ? 'D' : 'U');
+        }
+        const c = WD.cam, k = 1 - Math.pow(.0005, dt);
+        cam.x += (clamp(player.x, c.x0, c.x1) - cam.x) * k;
+        cam.z += (clamp(player.z, c.z0, c.z1) - cam.z) * k;
+        if (locked || S.scene === 'title') { cur = null; setHint(''); }
+        else { cur = nearInter(); setHint(cur ? (isTouch ? '[A] ' : '[E] ') + cur.label : ''); }
+      }
+      function render() {
+        ctx.fillStyle = '#0a0a14'; ctx.fillRect(0, 0, W, H);
+        WD.back();
+        const list = WD.objs.slice();
+        list.push({ z: player.z, f: () => drawActor(player.x, player.z, PAL, player.dir, player.moving, player.walk) });
+        list.sort((a, b) => a.z - b.z);
+        for (const o of list) o.f();
+        WD.top();
+        if (cur) arrow(cur.x, cur.ay, cur.z, S.t);
+        renderFade();
+      }
+
+      /* ---------- điều khiển ---------- */
+      function start(quiet) {
+        audio(); $('shTitle').style.display = 'none';
+        S.scene = 'shop'; setObj('Chọn một máy để ngồi chơi');
+        if (quiet) return;
+        say([{ n: 'Chủ tiệm', t: 'Chào mừng đến Tiệm Game 1990! Mỗi máy Famicom ở đây là một phòng chơi.' },
+          { n: 'Chủ tiệm', t: 'Máy tối màn hình là còn trống. Máy sáng là có người đang chơi, lại gần để ngồi chơi cùng hoặc đứng xem.' },
+          { n: 'Chủ tiệm', t: 'Lại gần ghế rồi bấm E để ngồi nhé!' }]);
+      }
+      function press(k) {
+        audio();
+        if (S.scene === 'title') { if (k === 'A') start(ss.get('shop-seen') === '1'); return; }
+        if (S.fade) return;
+        if (S.dialog) { if (k === 'A' || k === 'B') advance(); return; }
+        if (k === 'A' && cur) cur.fn();
+      }
+      const MAP = { ArrowLeft: 'L', KeyA: 'L', ArrowRight: 'R', KeyD: 'R', ArrowUp: 'U', KeyW: 'U', ArrowDown: 'D', KeyS: 'D', KeyE: 'A', Space: 'A', Enter: 'A', Escape: 'B' };
+      addEventListener('keydown', e => {
+        if (!visible() || e.ctrlKey || e.metaKey || e.altKey) return;
+        const k = MAP[e.code]; if (!k) return;
+        e.preventDefault();
+        if (!keys.has(k)) { keys.add(k); press(k); }
+      });
+      addEventListener('keyup', e => { const k = MAP[e.code]; if (k) keys.delete(k); });
+      addEventListener('blur', () => keys.clear());
+      document.querySelectorAll('#shPad [data-k]').forEach(b => {
+        const k = b.dataset.k;
+        b.addEventListener('pointerdown', e => { e.preventDefault(); if (!keys.has(k)) { keys.add(k); press(k); } b.classList.add('on'); });
+        ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => b.addEventListener(ev, () => { keys.delete(k); b.classList.remove('on'); }));
+      });
+      stage.addEventListener('pointerdown', e => {
+        if (e.target.closest('#shTitle') || e.target.id === 'shMute') return;
+        if (S.dialog) press('A');
+      });
+      $('shGo').addEventListener('click', e => { e.stopPropagation(); start(ss.get('shop-seen') === '1'); });
+
+      /* ---------- vòng lặp ---------- */
+      const wasReturning = returning;
+      rebuild(); if (!wasReturning) snapCam(); connect();
+      if (wasReturning || ss.get('shop-seen') === '1') {   // vừa rời máy quay lại tiệm: bỏ qua màn hình chào
+        ss.set('shop-seen', '1'); start(true);
+        if (wasReturning) setObj('Bạn vừa đứng dậy · chọn máy khác hoặc ngồi lại');
+      }
+      let last = performance.now();
+      function frame(now) {
+        requestAnimationFrame(frame);
+        const dt = Math.min(.05, (now - last) / 1000); last = now;
+        if (!visible()) return;               // đang ngồi ở máy: không vẽ tiệm
+        S.t += dt;
+        $('shMute').textContent = app.isMuted() ? '🔇' : '🔊';
+        updFade(dt); update(dt); updDlg(dt); render();
+      }
+      requestAnimationFrame(frame);
     })();
   </script>
 </body>

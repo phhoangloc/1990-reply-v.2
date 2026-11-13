@@ -36,6 +36,17 @@ const TYPES = {
   '.zip': 'application/zip'
 };
 
+// Băng game: các file .nes / .zip nằm trong public/ và public/roms/
+function listGames() {
+  const out = [];
+  for (const dir of ['', 'roms']) {
+    let names = [];
+    try { names = fs.readdirSync(path.join(ROOT, dir)); } catch { continue; }
+    for (const n of names) if (/\.(nes|zip)$/i.test(n)) out.push({ name: n.replace(/\.(nes|zip)$/i, ''), path: (dir ? dir + '/' : '') + n });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 const server = http.createServer((req, res) => {
   let pathname;
   try { pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname); }
@@ -43,6 +54,10 @@ const server = http.createServer((req, res) => {
   if (pathname === BASE.slice(0, -1) && BASE !== '/') { res.writeHead(302, { Location: BASE }); return res.end(); }
   if (!pathname.startsWith(BASE)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Not found'); }
   pathname = pathname.slice(BASE.length - 1);                   // bỏ tiền tố, giữ dấu / đầu
+  if (pathname === '/api/games') {                              // danh sách băng game có sẵn trên server
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(JSON.stringify(listGames()));
+  }
   if (pathname.endsWith('/') || !path.extname(pathname)) pathname = '/index.html'; // /:id trả về trang chính
   const file = path.join(ROOT, pathname);
   if (file !== ROOT && !file.startsWith(ROOT + path.sep)) { res.writeHead(403); return res.end('Forbidden'); }
@@ -62,8 +77,23 @@ const server = http.createServer((req, res) => {
 // Mỗi người tự chạy giả lập của mình; ai vào/ra cũng không làm người còn lại bị dừng.
 // Người vào khi phòng đã đủ 2 người sẽ là khán giả: nhận ROM + trạng thái từ người chơi cũ nhất (players[0]),
 // rồi nhận phím của cả hai người chơi để chạy theo. Có người chơi thoát thì khán giả vào sớm nhất được thay.
-const rooms = new Map(); // mã phòng -> { players: [ws] (tối đa 2, mỗi ws có .slot = 0 | 1), specs: [ws] }
+const rooms = new Map(); // mã phòng -> { players: [ws] (tối đa 2, mỗi ws có .slot = 0 | 1), specs: [ws], game: tên ROM đang chơi, at: lúc tạo }
 const MAX_SPECS = 20;
+// Tiệm game (trang chủ): các kết nối đang xem danh sách phòng, nhận cập nhật mỗi khi phòng thay đổi
+const lobby = new Set();
+let lobbyTimer = null;
+function roomList() {
+  return [...rooms].sort((a, b) => a[1].at - b[1].at)
+    .map(([room, r]) => ({ room, players: r.players.length, specs: r.specs.length, game: r.game || '' }));
+}
+function pushLobby() {                                          // gom nhiều thay đổi liền nhau thành một lần gửi
+  if (lobbyTimer) return;
+  lobbyTimer = setTimeout(() => {
+    lobbyTimer = null;
+    const msg = { t: 'rooms', list: roomList() };
+    for (const c of lobby) send(c, msg);
+  }, 50);
+}
 let nextId = 1;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function newCode() {
@@ -74,6 +104,7 @@ function newCode() {
 }
 // Danh sách người trong phòng: người chơi (P1, P2) và số khách xem. Gửi cho tất cả mỗi khi có thay đổi, kèm sự kiện vừa xảy ra (ev).
 function announce(r, ev) {
+  pushLobby();
   const players = r.players.slice().sort((a, b) => a.slot - b.slot).map(p => ({ id: p.id, slot: p.slot }));
   const specIds = r.specs.map(s => s.id);                 // để người chơi biết gọi voice cho khán giả nào
   for (const c of [...r.players, ...r.specs]) send(c, { t: 'roster', me: c.id, players, specs: r.specs.length, specIds, ev });
@@ -125,7 +156,7 @@ function leave(ws) {
   for (const m of r.players) send(m, { t: 'peerleft' });
   if (r.players.length || r.specs.length) announce(r, { k: 'left', role: 'player', id: ws.id, slot: ws.slot });
   fillSeats(r);                                           // sau đó mới báo khán giả vào chơi thay, để thông báo cuối cùng là "vào chơi thay"
-  if (!r.players.length && !r.specs.length) rooms.delete(code);
+  if (!r.players.length && !r.specs.length) { rooms.delete(code); pushLobby(); }
 }
 const RELAY = new Set(['rom', 'romend', 'snap', 'snapend', 'ready', 'go', 'in', 'sig', 'vsig']); // 'sig': signaling WebRTC phím; 'vsig': signaling chat voice (giữa hai người chơi)
 const FEED = new Set(['rom', 'romend', 'snap', 'snapend']); // gửi riêng cho 1 khán giả khi người chơi đang "feed"
@@ -153,10 +184,14 @@ wss.on('connection', ws => {
     let m; try { m = JSON.parse(raw); } catch { return; }
     if (!m || typeof m.t !== 'string') return;
     if (m.t === 'vsig') delete m.from;
+    if (m.t === 'lobby') {                                    // xem danh sách phòng (trang chủ)
+      lobby.add(ws);
+      return send(ws, { t: 'rooms', list: roomList() });
+    }
     if (m.t === 'create') {
       leave(ws);
       const code = newCode();
-      ws.slot = 0; rooms.set(code, { players: [ws], specs: [] }); ws.room = code;
+      ws.slot = 0; rooms.set(code, { players: [ws], specs: [], game: '', at: Date.now() }); ws.room = code;
       send(ws, { t: 'created', room: code, slot: 0 });
       announce(rooms.get(code), { k: 'created', id: ws.id, slot: 0 });
     } else if (m.t === 'join') {
@@ -193,6 +228,15 @@ wss.on('connection', ws => {
       if (r) for (const s of r.specs) send(s, { t: 'in', f: m.f, v: m.v, s: ws.slot });
     } else if (m.t === 'vsig' && m.to !== undefined) {        // người chơi gửi voice cho một khán giả
       vrelay(ws, m);
+    } else if (m.t === 'game') {                              // người chơi vừa cắm băng: hiện tên game trên máy trong tiệm
+      const r = ws.room && rooms.get(ws.room);
+      if (r) { r.game = String(m.name || '').slice(0, 60); pushLobby(); }
+    } else if (m.t === 'eject') {                             // người chơi rút băng: máy bên kia và khán giả cũng dừng game
+      const r = ws.room && rooms.get(ws.room); if (!r) return;
+      r.game = ''; pushLobby();
+      send(peerOf(ws), { t: 'eject' });
+      for (const s of r.specs) { s.fed = false; send(s, { t: 'eject' }); }
+      askFeeder(r);                                           // khi cắm băng mới và đồng bộ xong sẽ gửi lại game cho khán giả
     } else if (RELAY.has(m.t)) {
       if (ws.feeding && FEED.has(m.t)) return send(ws.feedTo, m);
       if (m.t === 'in') {                                     // khán giả nhận phím của cả hai người chơi
@@ -204,7 +248,7 @@ wss.on('connection', ws => {
       leave(ws);
     }
   });
-  ws.on('close', () => leave(ws));
+  ws.on('close', () => { lobby.delete(ws); leave(ws); });
   ws.on('error', () => { });
 });
 
