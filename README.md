@@ -5,7 +5,7 @@ Trình giả lập NES chạy ngay trên trình duyệt, kèm phòng chơi 2 ng�
 - Giả lập chạy hoàn toàn trên trình duyệt, Node.js chỉ phục vụ file và ghép cặp người chơi.
 - Hỗ trợ phím bàn phím, tay cầm và nút cảm ứng trên điện thoại.
 - Đổi phím điều khiển theo ý muốn.
-- Chơi 2 người qua liên kết `/nes/<mã phòng>` (tiền tố `/nes/` đổi được trong `.env`). Người được mời không cần có ROM.
+- Chơi 2 người qua liên kết `/<mã phòng>` (có thể thêm tiền tố đường dẫn bằng `BASE_ROUTE` trong `.env`). Người được mời không cần có ROM.
 
 ## Yêu cầu
 
@@ -20,7 +20,7 @@ npm install
 npm start
 ```
 
-Mở http://localhost:3000/nes/ (hoặc cổng bạn đặt trong `.env`). Toàn bộ app nằm dưới tiền tố `BASE_ROUTE`, mặc định trong `.env.example` là `/nes/`; để trống thì app nằm ở `/`.
+Mở http://localhost:3000/ (hoặc cổng bạn đặt trong `.env`). Mặc định app nằm ở gốc `/`; muốn đặt app dưới một tiền tố (ví dụ `/game/`) thì sửa `BASE_ROUTE` trong `.env`.
 
 Đổi cổng bằng file `.env` (khuyên dùng): sao chép `.env.example` thành `.env` rồi sửa `PORT`.
 
@@ -85,7 +85,7 @@ Tay cầm: được nhận tự động (bấm một nút để trình duyệt n
 ## Chơi 2 người
 
 1. Nạp ROM và bấm **Phòng 2 người** → **Tạo phòng**.
-2. Địa chỉ trang đổi thành dạng `http://<máy chủ>/nes/ABC123`. Bấm **Sao chép** và gửi liên kết cho bạn bè.
+2. Địa chỉ trang đổi thành dạng `http://<máy chủ>/ABC123`. Bấm **Sao chép** và gửi liên kết cho bạn bè.
 3. Bạn bè mở liên kết là tự vào phòng. Họ không cần ROM vì ROM được gửi tự động từ máy bạn.
 4. Hai bên chơi chung: người tạo phòng là người chơi 1, người vào sau là người chơi 2. Mỗi người dùng phím và tay cầm của máy mình.
 
@@ -102,7 +102,7 @@ Cách phòng hoạt động:
 
 `localhost` chỉ truy cập được trên máy bạn. Để bạn bè vào được:
 
-- **Cùng mạng LAN / Wi‑Fi**: dùng liên kết dạng `http://<IP máy bạn>:<cổng>/nes/<mã phòng>` (thay `localhost` trong liên kết bằng IP của máy chạy server).
+- **Cùng mạng LAN / Wi‑Fi**: dùng liên kết dạng `http://<IP máy bạn>:<cổng>/<mã phòng>` (thay `localhost` trong liên kết bằng IP của máy chạy server).
 - **Khác mạng**: cần đưa server lên một máy chủ có địa chỉ công khai, hoặc dùng công cụ tạo đường hầm (tunnel). Nếu dùng HTTPS thì WebSocket tự chuyển sang `wss://`.
 
 ## Game được hỗ trợ
@@ -130,8 +130,8 @@ Giả lập hỗ trợ các mapper: **0 (NROM), 1 (MMC1), 2 (UxROM), 3 (CNROM), 
     └── index.html   # Toàn bộ giả lập và giao diện
 ```
 
-- Server tĩnh phục vụ thư mục `public/`. Mọi đường dẫn không có đuôi file (ví dụ `/nes/ABC123`) đều trả về `index.html`. Đường dẫn nằm ngoài `BASE_ROUTE` trả về 404, riêng `/nes` được chuyển hướng sang `/nes/`.
-- WebSocket nằm ở `BASE_ROUTE` + `WS_PATH` (mặc định `/nes/ws`, đổi trong `.env`), dùng thư viện [`ws`](https://github.com/websockets/ws).
+- Server tĩnh phục vụ thư mục `public/`. Mọi đường dẫn không có đuôi file (ví dụ `/ABC123`) đều trả về `index.html`. Nếu đặt `BASE_ROUTE` (ví dụ `/game/`), đường dẫn nằm ngoài tiền tố đó trả về 404, riêng `/game` được chuyển hướng sang `/game/`.
+- WebSocket nằm ở `BASE_ROUTE` + `WS_PATH` (mặc định `/ws`, đổi trong `.env`), dùng thư viện [`ws`](https://github.com/websockets/ws).
 
 ## Lưu ý về ROM
 
